@@ -80,6 +80,14 @@ and Chinchilla's compute-optimal allocation and isoflop method. `show_plot`
 draws lines and points with log axes; `show_timeline` draws lanes of spans
 and is used by modules 7 and 8.
 
+Module 7 is serving: why decoding is memory-bound (a roofline model), a KV
+cache on your GPT, int8 and grouped int4 quantization, static versus
+continuous batching in a discrete-event simulation, a paged KV block
+allocator, speculative decoding (exact rejection sampling and a greedy
+version with a real draft model), and a serving simulator that combines
+continuous batching, paged memory and preemption, drawn with
+`show_timeline` (request lanes, KV memory and batch size over time).
+
 Lessons live in [`content/`](content/README.md) as Markdown with YAML front
 matter. Each lesson goes problem, prediction, build, hidden-test check, then
 the explanation. Progress is kept in `progress.json` in your workspace, and

@@ -1,0 +1,8 @@
+id: m07
+number: 7
+title: Serving
+summary: >
+  What it costs to generate a token and why decoding is memory-bound; a KV
+  cache; int8 and int4 quantization; static and continuous batching;
+  paged KV memory; speculative decoding; and a serving simulator that puts
+  them together.
