@@ -77,3 +77,6 @@ cd python && uv run pytest          # sidecar, end to end against a real kernel
 swift test                          # Swift core (unit)
 WORKBENCH_INTEGRATION=1 swift test  # plus Swift → sidecar → kernel
 ```
+
+CI runs the Python tests on Linux and builds and tests the app on a macOS
+runner.
