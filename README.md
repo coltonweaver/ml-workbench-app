@@ -10,8 +10,14 @@ The full spec lives in the "Hands-on ML tutorial app: spec" doc.
 
 ## Status
 
-Milestone 1 of the build plan: the app shell, the kernel bridge, a
-file-backed editor, and Run and Test buttons. Lessons arrive in milestone 2.
+Milestones 1 and 2 of the build plan: the app shell, kernel bridge,
+file-backed editor and Run/Test buttons, plus the lesson flow and all of
+module 1 (gradient descent through a working autograd engine and MLP).
+
+Lessons live in [`content/`](content/README.md) as Markdown with YAML front
+matter. Each lesson goes problem, prediction, build, hidden-test check, then
+the explanation. Progress is kept in `progress.json` in your workspace, and
+the workspace is committed each time you pass a lesson.
 
 ## Requirements
 
@@ -35,6 +41,7 @@ takes a minute. Your workspace is created at `~/ml-workbench` (override with
 | ⌘S | Save |
 | ⌘R | Run the open file in the kernel |
 | ⌘U | Run the tests for the open file |
+| ⌘K | Check the open lesson against its hidden tests |
 | ⌘. | Interrupt |
 | ⇧⌘0 | Restart the kernel |
 
@@ -55,7 +62,8 @@ Sources/
   MLWorkbench/      SwiftUI app
 Tests/
   WorkbenchCoreTests/
-python/             the sidecar: runs the Jupyter kernel and pytest
+content/            lessons, stubs, reference solutions, hidden tests
+python/             the sidecar: runs the Jupyter kernel, pytest and the lesson flow
   workbench_sidecar/
   tests/
 protocol.md         the JSON-lines protocol between the two

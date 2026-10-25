@@ -10,6 +10,10 @@ public struct SidecarRequest: Encodable, Equatable, Sendable {
         case interrupt
         case restart
         case shutdown
+        case listLessons = "list_lessons"
+        case openLesson = "open_lesson"
+        case submitPrediction = "submit_prediction"
+        case checkLesson = "check_lesson"
     }
 
     public var id: String
@@ -17,13 +21,20 @@ public struct SidecarRequest: Encodable, Equatable, Sendable {
     public var code: String?
     public var path: String?
     public var target: String?
+    public var lesson: String?
+    public var value: String?
 
-    public init(id: String, op: Op, code: String? = nil, path: String? = nil, target: String? = nil) {
+    public init(
+        id: String, op: Op, code: String? = nil, path: String? = nil, target: String? = nil,
+        lesson: String? = nil, value: String? = nil
+    ) {
         self.id = id
         self.op = op
         self.code = code
         self.path = path
         self.target = target
+        self.lesson = lesson
+        self.value = value
     }
 
     public func encodedLine() throws -> Data {
@@ -45,6 +56,8 @@ public struct SidecarEvent: Decodable, Equatable, Sendable {
         case displayData = "display_data"
         case error
         case testReport = "test_report"
+        case lessons
+        case lesson
         case done
     }
 
@@ -71,6 +84,10 @@ public struct SidecarEvent: Decodable, Equatable, Sendable {
     // done
     public var status: String?
 
+    // lessons / lesson
+    public var modules: [ModuleSummary]?
+    public var lesson: LessonDetail?
+
     // test_report (flattened into the event on the wire)
     public var outcome: String?
     public var passed: Int?
@@ -84,6 +101,7 @@ public struct SidecarEvent: Decodable, Equatable, Sendable {
         case protocolVersion = "protocol"
         case python, workspace, name, text, data, ename, evalue, traceback, status
         case outcome, passed, failed, tests, output
+        case modules, lesson
     }
 
     /// `text/plain` of an execute_result or display_data, if any.
@@ -167,5 +185,79 @@ public struct LineBuffer: Sendable {
             pending = Data(pending[pending.index(after: newline)...])
         }
         return lines
+    }
+}
+
+// MARK: Lessons
+
+public struct ModuleSummary: Decodable, Equatable, Sendable, Identifiable {
+    public var id: String
+    public var number: Int
+    public var title: String
+    public var summary: String
+    public var lessons: [LessonSummary]
+}
+
+public struct LessonSummary: Decodable, Equatable, Sendable, Identifiable {
+    public var id: String
+    public var title: String
+    /// "new", "in_progress" or "passed".
+    public var status: String
+}
+
+public struct LessonDetail: Decodable, Equatable, Sendable, Identifiable {
+    public struct Predict: Decodable, Equatable, Sendable {
+        /// "choice", "number" or "text".
+        public var kind: String
+        public var prompt: String
+        public var options: [String]?
+    }
+
+    public struct Prediction: Decodable, Equatable, Sendable {
+        public var value: String
+        public var submittedAt: String
+
+        enum CodingKeys: String, CodingKey {
+            case value
+            case submittedAt = "submitted_at"
+        }
+    }
+
+    public struct Feedback: Decodable, Equatable, Sendable {
+        /// nil for free-text predictions, which aren't graded.
+        public var correct: Bool?
+        public var yours: String
+        public var answer: String?
+    }
+
+    public struct Progress: Decodable, Equatable, Sendable {
+        public var status: String
+        public var attempts: Int
+        public var prediction: Prediction?
+        public var feedback: Feedback?
+    }
+
+    public var id: String
+    public var title: String
+    public var moduleID: String
+    public var moduleTitle: String
+    /// Workspace-relative path of the file the learner edits.
+    public var file: String
+    public var concepts: [String]
+    public var hook: String
+    public var build: String
+    /// Only sent once the lesson is passed.
+    public var explain: String?
+    public var stretch: String?
+    public var predict: Predict
+    public var progress: Progress
+
+    public var isPassed: Bool { progress.status == "passed" }
+    public var hasPrediction: Bool { progress.prediction != nil }
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, file, concepts, hook, build, explain, stretch, predict, progress
+        case moduleID = "module_id"
+        case moduleTitle = "module_title"
     }
 }

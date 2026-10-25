@@ -11,7 +11,16 @@ struct ContentView: View {
             FileList()
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220)
         } detail: {
-            EditorOutputSplit()
+            if model.lesson != nil {
+                HStack(spacing: 0) {
+                    LessonPane()
+                        .frame(minWidth: 320, idealWidth: 400, maxWidth: 460)
+                    Divider()
+                    EditorOutputSplit()
+                }
+            } else {
+                EditorOutputSplit()
+            }
         }
         .toolbar { WorkbenchToolbar(model: model) }
         .navigationTitle(model.selectedFile.map { $0 + (model.isDirty ? " •" : "") } ?? "ML Workbench")
@@ -77,14 +86,47 @@ private struct EditorOutputSplit: View {
     }
 }
 
+private struct LessonRow: View {
+    let lesson: LessonSummary
+
+    var body: some View {
+        Label {
+            Text("\(lesson.id)  \(lesson.title)")
+                .lineLimit(1)
+        } icon: {
+            switch lesson.status {
+            case "passed":
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.green)
+            case "in_progress":
+                Image(systemName: "circle.lefthalf.filled").foregroundStyle(Color.accentColor)
+            default:
+                Image(systemName: "circle").foregroundStyle(Color.secondary)
+            }
+        }
+    }
+}
+
 private struct FileList: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        List(model.files, id: \.self, selection: $model.selectedFile) { path in
-            Label(path, systemImage: path.contains("test_") ? "checkmark.seal" : "doc.text")
-                .lineLimit(1)
-                .truncationMode(.head)
+        List(selection: $model.selection) {
+            ForEach(model.modules) { module in
+                Section("\(module.number). \(module.title)") {
+                    ForEach(module.lessons) { lesson in
+                        LessonRow(lesson: lesson)
+                            .tag(SidebarItem.lesson(lesson.id))
+                    }
+                }
+            }
+            Section("Files") {
+                ForEach(model.files, id: \.self) { path in
+                    Label(path, systemImage: path.contains("test_") ? "checkmark.seal" : "doc.text")
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                        .tag(SidebarItem.file(path))
+                }
+            }
         }
         .safeAreaInset(edge: .bottom) {
             HStack {

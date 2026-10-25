@@ -5,18 +5,25 @@ public struct SidecarLaunch: Sendable {
     public var uv: URL
     public var pythonProject: URL
     public var workspace: URL
+    /// The lesson content folder; lessons are unavailable without it.
+    public var content: URL?
 
-    public init(uv: URL, pythonProject: URL, workspace: URL) {
+    public init(uv: URL, pythonProject: URL, workspace: URL, content: URL? = nil) {
         self.uv = uv
         self.pythonProject = pythonProject
         self.workspace = workspace
+        self.content = content
     }
 
     public var arguments: [String] {
-        [
+        var args = [
             "run", "--quiet", "--project", pythonProject.path,
             "python", "-m", "workbench_sidecar", "--workspace", workspace.path,
         ]
+        if let content {
+            args += ["--content", content.path]
+        }
+        return args
     }
 
     /// GUI apps don't inherit the login shell's PATH, so look in the usual
@@ -43,13 +50,30 @@ public struct SidecarLaunch: Sendable {
         environment: [String: String] = ProcessInfo.processInfo.environment,
         sourceFile: String = #filePath
     ) -> URL? {
+        findBundled("python", marker: "pyproject.toml", envKey: "WORKBENCH_PYTHON_PROJECT",
+                    environment: environment, sourceFile: sourceFile)
+    }
+
+    /// The lesson `content/` folder, searched the same way (`WORKBENCH_CONTENT`).
+    public static func findContent(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        sourceFile: String = #filePath
+    ) -> URL? {
+        findBundled("content", marker: "README.md", envKey: "WORKBENCH_CONTENT",
+                    environment: environment, sourceFile: sourceFile)
+    }
+
+    static func findBundled(
+        _ name: String, marker: String, envKey: String,
+        environment: [String: String], sourceFile: String
+    ) -> URL? {
         let fm = FileManager.default
         var candidates: [URL] = []
-        if let explicit = environment["WORKBENCH_PYTHON_PROJECT"] {
+        if let explicit = environment[envKey] {
             candidates.append(URL(fileURLWithPath: explicit))
         }
         if let resources = Bundle.main.resourceURL {
-            candidates.append(resources.appendingPathComponent("python"))
+            candidates.append(resources.appendingPathComponent(name))
         }
         // Sources/WorkbenchCore/SidecarClient.swift -> repo root
         candidates.append(
@@ -57,9 +81,9 @@ public struct SidecarLaunch: Sendable {
                 .deletingLastPathComponent()
                 .deletingLastPathComponent()
                 .deletingLastPathComponent()
-                .appendingPathComponent("python")
+                .appendingPathComponent(name)
         )
-        return candidates.first { fm.fileExists(atPath: $0.appendingPathComponent("pyproject.toml").path) }
+        return candidates.first { fm.fileExists(atPath: $0.appendingPathComponent(marker).path) }
     }
 }
 
@@ -159,6 +183,31 @@ public final class SidecarClient: @unchecked Sendable {
     @discardableResult
     public func restart() throws -> String {
         try send(.restart)
+    }
+
+    @discardableResult
+    public func listLessons() throws -> String {
+        try send(.listLessons)
+    }
+
+    /// Copies the lesson's stub into the workspace if the file isn't there yet.
+    @discardableResult
+    public func openLesson(_ id: String) throws -> String {
+        try send(.openLesson) { $0.lesson = id }
+    }
+
+    @discardableResult
+    public func submitPrediction(lesson id: String, value: String) throws -> String {
+        try send(.submitPrediction) {
+            $0.lesson = id
+            $0.value = value
+        }
+    }
+
+    /// Runs the lesson's hidden tests and records the result in progress.json.
+    @discardableResult
+    public func checkLesson(_ id: String) throws -> String {
+        try send(.checkLesson) { $0.lesson = id }
     }
 
     public func interrupt() throws {

@@ -1,0 +1,7 @@
+id: m01
+number: 1
+title: Gradient descent and backprop
+summary: >
+  From "which way is downhill?" to a working autograd engine that trains a
+  small neural network. Everything later in the course is built on the
+  engine you write here.

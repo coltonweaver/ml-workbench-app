@@ -14,10 +14,14 @@ from pathlib import Path
 import pytest
 
 
+CONTENT = Path(__file__).resolve().parents[2] / "content"
+
+
 class Sidecar:
     def __init__(self, workspace: Path) -> None:
         self.proc = subprocess.Popen(
-            [sys.executable, "-m", "workbench_sidecar", "--workspace", str(workspace)],
+            [sys.executable, "-m", "workbench_sidecar", "--workspace", str(workspace),
+             "--content", str(CONTENT)],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True,
         )
         self.events: queue.Queue[dict] = queue.Queue()
@@ -180,3 +184,40 @@ def test_unknown_op_is_a_protocol_error(sidecar: Sidecar) -> None:
     event = sidecar.next()
     assert event["id"] == "x1"
     assert event["ename"] == "ProtocolError"
+
+
+def test_lesson_flow_over_the_protocol(sidecar: Sidecar, workspace: Path) -> None:
+    events = sidecar.request(op="list_lessons")
+    modules = next(e for e in events if e["type"] == "lessons")["modules"]
+    assert modules[0]["lessons"][0] == {"id": "1.1", "title": "Which way is downhill?", "status": "new"}
+
+    events = sidecar.request(op="open_lesson", lesson="1.1")
+    lesson = next(e for e in events if e["type"] == "lesson")["lesson"]
+    assert lesson["file"] == "m01/slope.py" and lesson["explain"] is None
+    assert (workspace / "m01" / "slope.py").exists()
+
+    events = sidecar.request(op="submit_prediction", lesson="1.1", value="nope")
+    assert any(e["type"] == "error" and e["ename"] == "LessonError" for e in events)
+    events = sidecar.request(op="submit_prediction", lesson="1.1", value="3")
+    lesson = next(e for e in events if e["type"] == "lesson")["lesson"]
+    assert lesson["progress"]["prediction"]["value"] == "3"
+
+    events = sidecar.request(op="check_lesson", lesson="1.1")
+    report = next(e for e in events if e["type"] == "test_report")
+    assert report["outcome"] == "failed"
+    assert events[-1]["status"] == "error"
+
+    solution = (CONTENT / "m01-backprop" / "solutions" / "slope.py").read_text()
+    (workspace / "m01" / "slope.py").write_text(solution)
+    events = sidecar.request(op="check_lesson", lesson="1.1")
+    kinds = [e["type"] for e in events]
+    assert kinds[-4:] == ["test_report", "lesson", "lessons", "done"], kinds
+    lesson = next(e for e in events if e["type"] == "lesson")["lesson"]
+    assert lesson["progress"]["status"] == "passed"
+    assert lesson["explain"] and lesson["progress"]["feedback"]["correct"] is True
+    assert events[-1]["status"] == "ok"
+
+
+def test_unknown_lesson_is_a_lesson_error(sidecar: Sidecar) -> None:
+    events = sidecar.request(op="open_lesson", lesson="99.9")
+    assert any(e["type"] == "error" and e["ename"] == "LessonError" for e in events)

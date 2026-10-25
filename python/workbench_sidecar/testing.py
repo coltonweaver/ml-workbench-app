@@ -18,6 +18,8 @@ PLUGIN = "workbench_sidecar.pytest_plugin"
 
 
 class TestRun:
+    __test__ = False  # not a pytest test class, despite the name
+
     def __init__(self, workspace: str, target: str, timeout: float = 300) -> None:
         self.workspace = workspace
         self.target = target
@@ -36,6 +38,10 @@ class TestRun:
             )
             cmd = [sys.executable, "-m", "pytest", "-p", PLUGIN, "-q",
                    "--no-header", "-p", "no:cacheprovider", self.target]
+            if os.path.commonpath([self.target, self.workspace]) != self.workspace:
+                # Hidden lesson tests live outside the workspace; keep pytest
+                # from hunting for config files above them.
+                cmd += ["--rootdir", os.path.dirname(self.target)]
             with self._lock:
                 if self.cancelled:
                     return _cancelled()

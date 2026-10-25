@@ -15,7 +15,10 @@ final class SidecarIntegrationTests: XCTestCase {
         let ws = Workspace(root: root)
         try ws.prepare(initGit: false)
 
-        let client = SidecarClient(launch: SidecarLaunch(uv: uv, pythonProject: project, workspace: root))
+        let content = try XCTUnwrap(SidecarLaunch.findContent(), "content/ not found")
+        let client = SidecarClient(launch: SidecarLaunch(
+            uv: uv, pythonProject: project, workspace: root, content: content
+        ))
         try client.start()
         defer { client.shutdown() }
 
@@ -43,5 +46,28 @@ final class SidecarIntegrationTests: XCTestCase {
         let report = try XCTUnwrap(tests.compactMap(\.testReport).first)
         XCTAssertEqual(report.outcome, "passed")
         XCTAssertEqual(report.passed, 1)
+
+        // Lesson flow: open, predict, fail, then pass with the reference solution.
+        let opened = try await collect(until: client.openLesson("1.1"))
+        let lesson = try XCTUnwrap(opened.compactMap(\.lesson).first)
+        XCTAssertEqual(lesson.file, "m01/slope.py")
+        XCTAssertNil(lesson.explain)
+
+        let predicted = try await collect(until: client.submitPrediction(lesson: "1.1", value: "3"))
+        XCTAssertEqual(predicted.compactMap(\.lesson).first?.hasPrediction, true)
+
+        let failing = try await collect(until: client.checkLesson("1.1"))
+        XCTAssertEqual(failing.compactMap(\.testReport).first?.outcome, "failed")
+
+        let solution = try String(
+            contentsOf: content.appendingPathComponent("m01-backprop/solutions/slope.py"), encoding: .utf8
+        )
+        try ws.write("m01/slope.py", contents: solution)
+        let passing = try await collect(until: client.checkLesson("1.1"))
+        XCTAssertEqual(passing.compactMap(\.testReport).first?.outcome, "passed")
+        let passed = try XCTUnwrap(passing.compactMap(\.lesson).first)
+        XCTAssertTrue(passed.isPassed)
+        XCTAssertEqual(passed.progress.feedback?.correct, true)
+        XCTAssertNotNil(passed.explain)
     }
 }

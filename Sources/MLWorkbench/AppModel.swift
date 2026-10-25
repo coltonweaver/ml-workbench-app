@@ -9,6 +9,11 @@ struct OutputChunk: Identifiable, Equatable {
     var text: String
 }
 
+enum SidebarItem: Hashable {
+    case lesson(String)
+    case file(String)
+}
+
 enum KernelState: Equatable {
     case stopped
     case starting
@@ -44,6 +49,15 @@ final class AppModel: ObservableObject {
     @Published var outputTab: OutputTab = .output
     @Published var errorMessage: String?
 
+    @Published private(set) var modules: [ModuleSummary] = []
+    @Published private(set) var lesson: LessonDetail?
+    /// What the learner has typed or picked for the open lesson's prediction.
+    /// For a choice prediction this is the option's index.
+    @Published var predictionDraft = ""
+    @Published var selection: SidebarItem? {
+        didSet { if selection != oldValue { selectionChanged() } }
+    }
+
     enum OutputTab: Hashable { case output, tests }
 
     private var savedText = ""
@@ -61,7 +75,7 @@ final class AppModel: ObservableObject {
         do {
             try workspace.prepare()
             refreshFiles()
-            if selectedFile == nil { selectedFile = files.first }
+            if selection == nil, let first = files.first { selection = .file(first) }
         } catch {
             errorMessage = "Couldn't prepare workspace at \(workspace.root.path): \(error.localizedDescription)"
         }
@@ -80,7 +94,11 @@ final class AppModel: ObservableObject {
             return
         }
         stopKernel()
-        let client = SidecarClient(launch: SidecarLaunch(uv: uv, pythonProject: project, workspace: workspace.root))
+        let launch = SidecarLaunch(
+            uv: uv, pythonProject: project, workspace: workspace.root,
+            content: SidecarLaunch.findContent()
+        )
+        let client = SidecarClient(launch: launch)
         client.onExit = { [weak self] error in
             Task { @MainActor in
                 self?.kernelState = .failed("exited")
@@ -112,6 +130,28 @@ final class AppModel: ObservableObject {
         client = nil
         pending.removeAll()
         kernelState = .stopped
+    }
+
+    // MARK: Selection
+
+    private func selectionChanged() {
+        save()
+        switch selection {
+        case .file(let path):
+            lesson = nil
+            selectedFile = path
+        case .lesson(let id):
+            predictionDraft = ""
+            guard let client else { return }
+            // The sidecar answers with a `lesson` event; handle() opens its file.
+            do {
+                try client.openLesson(id)
+            } catch {
+                append(.error, "Couldn't reach the sidecar: \(error.localizedDescription)\n")
+            }
+        case nil:
+            lesson = nil
+        }
     }
 
     // MARK: Files
@@ -160,7 +200,30 @@ final class AppModel: ObservableObject {
 
     // MARK: Actions
 
-    var canRun: Bool { selectedFile != nil && kernelState == .idle }
+    var canRun: Bool { selectedFile != nil && kernelState == .idle && !needsPrediction }
+
+    /// Problem first: in a lesson, code doesn't run until a prediction is in.
+    var needsPrediction: Bool {
+        guard let lesson else { return false }
+        return !lesson.hasPrediction && selectedFile == lesson.file
+    }
+
+    var canCheck: Bool { lesson?.hasPrediction == true && kernelState == .idle }
+
+    func submitPrediction() {
+        guard let lesson, let client else { return }
+        let value = predictionDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+        submit { try client.submitPrediction(lesson: lesson.id, value: value) }
+    }
+
+    func check() {
+        guard let lesson, let client, canCheck else { return }
+        save()
+        testReport = nil
+        outputTab = .tests
+        submit { try client.checkLesson(lesson.id) }
+    }
 
     func run() {
         guard let path = selectedFile, let client else { return }
@@ -207,10 +270,25 @@ final class AppModel: ObservableObject {
         case .ready:
             kernelState = .idle
             append(.info, "Python \(event.python ?? "?") ready in \(event.workspace ?? workspace.root.path)\n")
+            if let client {
+                submit { try client.listLessons() }
+                if case .lesson(let id)? = selection { submit { try client.openLesson(id) } }
+            }
+        case .lessons:
+            modules = event.modules ?? []
+        case .lesson:
+            guard let detail = event.lesson, selection == .lesson(detail.id) else { break }
+            lesson = detail
+            if selectedFile != detail.file {
+                refreshFiles()
+                selectedFile = detail.file
+            }
         case .stream:
             append(event.name == "stderr" ? .stderr : .stdout, event.text ?? "")
         case .executeResult, .displayData:
             if let text = event.plainText { append(.result, text + "\n") }
+        case .error where event.ename == "LessonError":
+            errorMessage = event.evalue
         case .error:
             var text = "\(event.ename ?? "Error"): \(event.evalue ?? "")\n"
             if let tb = event.traceback, !tb.isEmpty {

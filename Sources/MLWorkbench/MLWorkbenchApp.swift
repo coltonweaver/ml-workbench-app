@@ -34,6 +34,9 @@ struct MLWorkbenchApp: App {
                 Button("Test") { model.test() }
                     .keyboardShortcut("u")
                     .disabled(!model.canRun)
+                Button("Check Lesson") { model.check() }
+                    .keyboardShortcut("k")
+                    .disabled(!model.canCheck)
                 Button("Stop") { model.interrupt() }
                     .keyboardShortcut(".")
                 Divider()
