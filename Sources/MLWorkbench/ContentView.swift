@@ -11,12 +11,7 @@ struct ContentView: View {
             FileList()
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220)
         } detail: {
-            VSplitView {
-                EditorPane()
-                    .frame(minHeight: 200)
-                OutputPane()
-                    .frame(minHeight: 140, idealHeight: 220)
-            }
+            EditorOutputSplit()
         }
         .toolbar { WorkbenchToolbar(model: model) }
         .navigationTitle(model.selectedFile.map { $0 + (model.isDirty ? " •" : "") } ?? "ML Workbench")
@@ -31,6 +26,54 @@ struct ContentView: View {
         } message: {
             Text(model.errorMessage ?? "")
         }
+    }
+}
+
+/// Editor over output with a draggable divider. Not VSplitView: it hosts each
+/// pane separately, so the editor ran up under the toolbar and the output pane
+/// got the toolbar's height as an empty inset above it.
+private struct EditorOutputSplit: View {
+    @State private var outputHeight: CGFloat = 240
+    @State private var dragStartHeight: CGFloat?
+
+    private let minEditor: CGFloat = 160
+    private let minOutput: CGFloat = 100
+
+    var body: some View {
+        GeometryReader { geo in
+            VStack(spacing: 0) {
+                EditorPane()
+                    .frame(maxHeight: .infinity)
+                divider(totalHeight: geo.size.height)
+                OutputPane()
+                    .frame(height: clamped(outputHeight, total: geo.size.height))
+            }
+        }
+    }
+
+    private func divider(totalHeight: CGFloat) -> some View {
+        Rectangle()
+            .fill(Color(nsColor: .separatorColor))
+            .frame(height: 1)
+            .padding(.vertical, 3)
+            .contentShape(Rectangle())
+            .onHover { inside in
+                if inside { NSCursor.resizeUpDown.push() } else { NSCursor.pop() }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { value in
+                        let start = dragStartHeight ?? outputHeight
+                        dragStartHeight = start
+                        outputHeight = clamped(start - value.translation.height, total: totalHeight)
+                    }
+                    .onEnded { _ in dragStartHeight = nil }
+            )
+    }
+
+    private func clamped(_ height: CGFloat, total: CGFloat) -> CGFloat {
+        let maxOutput = max(minOutput, total - minEditor - 7)
+        return min(max(height, minOutput), maxOutput)
     }
 }
 

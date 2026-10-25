@@ -32,6 +32,7 @@ struct CodeEditor: NSViewRepresentable {
         // reload), so typing doesn't reset the cursor.
         view.string = text
         view.setSelectedRange(NSRange(location: 0, length: 0))
+        view.scrollToBeginningOfDocument(nil)
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
