@@ -14,6 +14,8 @@ public struct SidecarRequest: Encodable, Equatable, Sendable {
         case openLesson = "open_lesson"
         case submitPrediction = "submit_prediction"
         case checkLesson = "check_lesson"
+        case askTutor = "ask_tutor"
+        case cancelTutor = "cancel_tutor"
     }
 
     public var id: String
@@ -23,10 +25,16 @@ public struct SidecarRequest: Encodable, Equatable, Sendable {
     public var target: String?
     public var lesson: String?
     public var value: String?
+    // ask_tutor
+    public var question: String?
+    public var history: [TutorTurn]?
+    public var apiKey: String?
+    public var tensor: JSONValue?
 
     public init(
         id: String, op: Op, code: String? = nil, path: String? = nil, target: String? = nil,
-        lesson: String? = nil, value: String? = nil
+        lesson: String? = nil, value: String? = nil, question: String? = nil,
+        history: [TutorTurn]? = nil, apiKey: String? = nil, tensor: JSONValue? = nil
     ) {
         self.id = id
         self.op = op
@@ -35,6 +43,15 @@ public struct SidecarRequest: Encodable, Equatable, Sendable {
         self.target = target
         self.lesson = lesson
         self.value = value
+        self.question = question
+        self.history = history
+        self.apiKey = apiKey
+        self.tensor = tensor
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, op, code, path, target, lesson, value, question, history, tensor
+        case apiKey = "api_key"
     }
 
     public func encodedLine() throws -> Data {
@@ -59,6 +76,8 @@ public struct SidecarEvent: Decodable, Equatable, Sendable {
         case testReport = "test_report"
         case lessons
         case lesson
+        case tutorDelta = "tutor_delta"
+        case tutorDone = "tutor_done"
         case done
     }
 
@@ -87,6 +106,11 @@ public struct SidecarEvent: Decodable, Equatable, Sendable {
     // done
     public var status: String?
 
+    // tutor_done (tutor_delta uses `text`)
+    public var stopReason: String?
+    public var model: String?
+    public var note: String?
+
     // lessons / lesson
     public var modules: [ModuleSummary]?
     public var lesson: LessonDetail?
@@ -106,6 +130,8 @@ public struct SidecarEvent: Decodable, Equatable, Sendable {
         case displayID = "display_id"
         case outcome, passed, failed, tests, output
         case modules, lesson
+        case stopReason = "stop_reason"
+        case model, note
     }
 
     /// `text/plain` of an execute_result or display_data, if any.
@@ -144,6 +170,21 @@ public struct TestReport: Equatable, Sendable {
     public var tests: [TestCase]
     /// pytest's own console output, for when the structured report isn't enough.
     public var output: String
+}
+
+/// One message of the tutor chat, as the learner saw it.
+public struct TutorTurn: Codable, Equatable, Sendable {
+    public enum Role: String, Codable, Sendable {
+        case user, assistant
+    }
+
+    public var role: Role
+    public var text: String
+
+    public init(role: Role, text: String) {
+        self.role = role
+        self.text = text
+    }
 }
 
 /// Minimal JSON tree for the `data` bundles the kernel returns.

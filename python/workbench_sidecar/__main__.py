@@ -3,6 +3,7 @@
 Requests are read from stdin one JSON object per line. Long-running requests
 (execute, run_file, run_tests, restart) are handled one at a time on a worker
 thread, so ``interrupt`` and ``shutdown`` stay responsive while code runs.
+Tutor questions (``ask_tutor``) have a thread of their own.
 """
 
 from __future__ import annotations
@@ -20,10 +21,12 @@ from . import PROTOCOL_VERSION
 from .kernel import KernelSession
 from .lessons import Catalog, ContentError, LessonService
 from .testing import TestRun
+from .tutor import Tutor, TutorError, TutorRequest, build_context
 
 
 class Server:
-    def __init__(self, workspace: str, out: TextIO, content: str | None = None) -> None:
+    def __init__(self, workspace: str, out: TextIO, content: str | None = None,
+                 tutor: Tutor | None = None) -> None:
         self.workspace = os.path.abspath(workspace)
         self.kernel = KernelSession(self.workspace)
         self.lessons = LessonService(Catalog(content), self.workspace) if content else None
@@ -32,6 +35,11 @@ class Server:
         self._jobs: queue.Queue[dict[str, Any] | None] = queue.Queue()
         self._current_test: TestRun | None = None
         self._worker = threading.Thread(target=self._work, daemon=True)
+        # The tutor has its own queue so the learner can ask while code runs.
+        self.tutor = tutor or Tutor()
+        self._questions: queue.Queue[dict[str, Any] | None] = queue.Queue()
+        self._tutor_worker = threading.Thread(target=self._answer, daemon=True)
+        self.last_problem: str | None = None
 
     def send(self, event: dict[str, Any]) -> None:
         line = json.dumps(event, separators=(",", ":"))
@@ -42,6 +50,7 @@ class Server:
     def start(self) -> None:
         self.kernel.start()
         self._worker.start()
+        self._tutor_worker.start()
         self.send({"type": "ready", "protocol": PROTOCOL_VERSION,
                    "python": sys.version.split()[0], "workspace": self.workspace})
 
@@ -54,7 +63,13 @@ class Server:
                 test.cancel()
             else:
                 self.kernel.interrupt()
+        elif op == "cancel_tutor":
+            self.tutor.cancel()
+        elif op == "ask_tutor":
+            self._questions.put(request)
         elif op == "shutdown":
+            self.tutor.cancel()
+            self._questions.put(None)
             self._jobs.put(None)
             self._worker.join(timeout=5)
             self.kernel.shutdown()
@@ -87,6 +102,7 @@ class Server:
         op = request["op"]
 
         def emit(event: dict[str, Any]) -> None:
+            self._note_problem(op, event)
             self.send({**event, "id": rid})
 
         if op == "execute":
@@ -106,6 +122,61 @@ class Server:
             self.kernel.restart()
             return "ok"
         raise ValueError(f"unhandled op {op!r}")
+
+    def _note_problem(self, op: str, event: dict[str, Any]) -> None:
+        """Remember the last error or test failure for the tutor."""
+        kind = event.get("type")
+        if kind == "error":
+            lines = [f"{event.get('ename')}: {event.get('evalue')}"]
+            lines += [_strip_ansi(l) for l in event.get("traceback") or []][-30:]
+            self.last_problem = f"({op}) " + "\n".join(lines)
+        elif kind == "test_report":
+            failing = [t for t in event.get("tests", []) if t["outcome"] in ("failed", "error")]
+            if event.get("outcome") == "passed":
+                self.last_problem = None
+            elif failing:
+                self.last_problem = f"({op}) {len(failing)} test(s) failing:\n" + "\n\n".join(
+                    f"{t['nodeid']}\n{t.get('message') or ''}" for t in failing[:5])
+            elif event.get("outcome") in ("error", "no_tests"):
+                self.last_problem = f"({op}) pytest: {event.get('outcome')}\n" + (
+                    event.get("output") or "")[-3000:]
+
+    def _answer(self) -> None:
+        while (request := self._questions.get()) is not None:
+            rid = request.get("id")
+
+            def emit(event: dict[str, Any]) -> None:
+                self.send({**event, "id": rid})
+
+            try:
+                status = self._ask(request, emit)
+            except (TutorError, ContentError) as exc:
+                emit({"type": "error", "ename": "TutorError", "evalue": str(exc), "traceback": []})
+                status = "error"
+            except Exception as exc:
+                emit({"type": "error", "ename": type(exc).__name__, "evalue": str(exc),
+                      "traceback": traceback.format_exc().splitlines()})
+                status = "error"
+            emit({"type": "done", "status": status})
+
+    def _ask(self, request: dict[str, Any], emit) -> str:  # noqa: ANN001
+        ask = TutorRequest.parse(request)
+        lesson = None
+        mistakes: list[dict[str, Any]] = []
+        code = ask.code
+        if self.lessons is not None:
+            mistakes = self.lessons.mistakes()
+            if ask.lesson:
+                lesson = self.lessons.detail(ask.lesson)
+                if code is None:
+                    try:
+                        with open(self._resolve(lesson["file"])) as f:
+                            code = f.read()
+                    except OSError:
+                        code = None
+        context = build_context(lesson=lesson, code=code, problem=self.last_problem,
+                                mistakes=mistakes, tensor=ask.tensor)
+        return self.tutor.ask(ask, context, emit)
 
     def _test(self, target: str) -> dict[str, Any]:
         run = TestRun(self.workspace, target)
@@ -145,6 +216,11 @@ class Server:
         if os.path.commonpath([full, self.workspace]) != self.workspace:
             raise ValueError(f"{path!r} is outside the workspace")
         return full
+
+
+def _strip_ansi(text: str) -> str:
+    import re
+    return re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", text)
 
 
 def serve(workspace: str, inp: TextIO, out: TextIO, content: str | None = None) -> None:

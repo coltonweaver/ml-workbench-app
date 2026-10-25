@@ -19,6 +19,17 @@ public enum Instrument: Equatable, Sendable {
         }
     }
 
+    /// The tensor summaries a widget carries for "Explain this tensor"
+    /// (the `explain` list every `workbench` payload has).
+    public static func explainSummaries(data: [String: JSONValue]) -> [JSONValue] {
+        for (key, value) in data.sorted(by: { $0.key < $1.key }) where key.hasPrefix("application/vnd.workbench.") {
+            if case .object(let payload) = value, case .array(let summaries)? = payload["explain"] {
+                return summaries
+            }
+        }
+        return []
+    }
+
     public var title: String {
         switch self {
         case .graph(let g): g.title ?? "Computation graph"
@@ -28,6 +39,12 @@ public enum Instrument: Equatable, Sendable {
 }
 
 extension JSONValue {
+    /// The `name` field of an object, if it has one.
+    public var name: String? {
+        if case .object(let o) = self, case .string(let s)? = o["name"] { return s }
+        return nil
+    }
+
     /// Re-decodes this tree as a typed value.
     public func decode<T: Decodable>(_ type: T.Type) throws -> T {
         try JSONDecoder().decode(T.self, from: JSONEncoder().encode(self))

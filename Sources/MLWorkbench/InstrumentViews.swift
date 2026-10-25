@@ -23,8 +23,12 @@ struct InstrumentsPane: View {
                     }
                     ForEach(model.instruments) { item in
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(item.instrument.title)
-                                .font(.subheadline.weight(.semibold))
+                            HStack {
+                                Text(item.instrument.title)
+                                    .font(.subheadline.weight(.semibold))
+                                Spacer()
+                                ExplainButton(summaries: item.explain)
+                            }
                             switch item.instrument {
                             case .graph(let graph):
                                 GraphInstrumentView(graph: graph)
@@ -38,6 +42,31 @@ struct InstrumentsPane: View {
                 }
                 .padding(8)
             }
+        }
+    }
+}
+
+/// "Explain this tensor": asks the tutor about one of the widget's tensors.
+struct ExplainButton: View {
+    @EnvironmentObject private var model: AppModel
+    let summaries: [JSONValue]
+
+    var body: some View {
+        if summaries.count == 1, let only = summaries.first {
+            Button("Explain") { model.explain(only) }
+                .buttonStyle(.borderless)
+                .help("Ask the tutor about \(only.name ?? "this tensor")")
+                .disabled(model.tutor.isAnswering)
+        } else if !summaries.isEmpty {
+            Menu("Explain") {
+                ForEach(Array(summaries.enumerated()), id: \.offset) { _, summary in
+                    Button(summary.name ?? "tensor") { model.explain(summary) }
+                }
+            }
+            .menuStyle(.button)
+            .buttonStyle(.borderless)
+            .fixedSize()
+            .disabled(model.tutor.isAnswering)
         }
     }
 }

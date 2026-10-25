@@ -210,6 +210,28 @@ public final class SidecarClient: @unchecked Sendable {
         try send(.checkLesson) { $0.lesson = id }
     }
 
+    /// Asks the tutor. `code` is the editor's current text (it may not be
+    /// saved yet); `tensor` is set by "Explain this tensor". The answer
+    /// streams back as `tutor_delta` events, then `tutor_done`.
+    @discardableResult
+    public func askTutor(
+        question: String, history: [TutorTurn], apiKey: String?, lesson: String?,
+        code: String?, tensor: JSONValue? = nil
+    ) throws -> String {
+        try send(.askTutor) {
+            $0.question = question
+            $0.history = history
+            $0.apiKey = apiKey
+            $0.lesson = lesson
+            $0.code = code
+            $0.tensor = tensor
+        }
+    }
+
+    public func cancelTutor() throws {
+        try send(.cancelTutor)
+    }
+
     public func interrupt() throws {
         try send(.interrupt)
     }

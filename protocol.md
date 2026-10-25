@@ -29,10 +29,16 @@ echoes it.
 | `list_lessons` |       | Re-reads the content folder; answers with `lessons`. |
 | `open_lesson` | `lesson` | Copies the lesson's stub into the workspace if its file doesn't exist, marks it in progress; answers with `lesson`. |
 | `submit_prediction` | `lesson`, `value` | Records the prediction (once per lesson). `value` is a string: the number, the option index, or free text. Answers with `lesson`. |
+| `ask_tutor` | `question`, `history`, `api_key`, `lesson`, `code`, `tensor` | Asks the tutor. `history` is the chat so far as `[{role, text}]`; `code` is the editor's text for the open lesson's file (read from disk when absent); `tensor` is a summary from an instrument's `explain` list. `api_key` may be null, then `ANTHROPIC_API_KEY` is used. Answers with `tutor_delta` events and `tutor_done`. |
+| `cancel_tutor` | | Stops the answer that's streaming. Handled immediately. |
 | `check_lesson` | `lesson` | Runs the lesson's hidden tests against the workspace, updates `progress.json`, commits the workspace on a first pass. Answers with `test_report`, `lesson`, `lessons`. |
 
-Everything except `interrupt` and `shutdown` is queued and handled one at a
-time. Paths that resolve outside the workspace are refused. Lesson errors (an
+Everything except `interrupt`, `shutdown`, `ask_tutor` and `cancel_tutor` is
+queued and handled one at a time. Tutor questions have their own queue, so
+they're answered while code runs. The sidecar remembers the last `error` or
+failing `test_report` it sent and gives it to the tutor; a passing report
+clears it. Tutor problems (no key, a rejected key, no network) come back as
+an `error` event with `ename` `TutorError`. Paths that resolve outside the workspace are refused. Lesson errors (an
 unknown lesson, an invalid prediction) come back as an `error` event with
 `ename` `LessonError`.
 
@@ -45,6 +51,12 @@ the MIME types `application/vnd.workbench.graph+json` and
 untouched; the app draws them in the Instruments tab and applies
 `update_display_data` to the widget with the same `display_id`. Non-finite
 numbers are sent as null.
+
+Every payload also has an `explain` list of tensor summaries, made by
+`workbench.tensor_summary`: `{name, shape, count, non_finite, stats: {min,
+max, mean, std, zeros}, values (16 or fewer entries only), provenance: {file,
+line, function, code}}` plus instrument-specific notes. "Explain this tensor"
+sends one of them as `ask_tutor`'s `tensor`.
 
 ## Events (sidecar → app)
 
@@ -59,6 +71,8 @@ numbers are sent as null.
 | `test_report`    | `outcome` (`passed`, `failed`, `no_tests`, `timeout`, `cancelled`, `error`), `exit_code`, `passed`, `failed`, `tests` (list of `{nodeid, outcome, duration, message}`), `output` (pytest's console text) |
 | `lessons`        | `modules`: list of `{id, number, title, summary, lessons: [{id, title, status}]}`; status is `new`, `in_progress` or `passed` |
 | `lesson`         | `lesson`: `{id, title, module_id, module_title, file, concepts, hook, build, explain, stretch, predict: {kind, prompt, options}, progress: {status, attempts, prediction, feedback}}`. `explain`, `stretch` and `feedback` are null until the lesson is passed. |
+| `tutor_delta`    | `text`: the next piece of the tutor's answer |
+| `tutor_done`     | `stop_reason` (`end_turn`, `max_tokens`, `refusal`, `cancelled`), `model`, `note` (why it stopped, for refusals) |
 | `done`           | `status` (`ok`, `error`, `aborted`). Always the last event for a request. |
 
 Example:

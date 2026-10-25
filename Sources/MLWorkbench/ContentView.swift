@@ -22,6 +22,10 @@ struct ContentView: View {
                 EditorOutputSplit()
             }
         }
+        .inspector(isPresented: $model.showTutor) {
+            TutorPanel()
+                .inspectorColumnWidth(min: 280, ideal: 340, max: 520)
+        }
         .toolbar { WorkbenchToolbar(model: model) }
         .navigationTitle(model.selectedFile.map { $0 + (model.isDirty ? " •" : "") } ?? "ML Workbench")
         .onChange(of: scenePhase) { _, phase in
@@ -293,6 +297,8 @@ private struct WorkbenchToolbar: ToolbarContent {
             Button { model.interrupt() } label: { Label("Stop", systemImage: "stop.fill") }
                 .disabled(model.kernelState != .busy)
                 .help("Interrupt (⌘.)")
+            Button { model.showTutor.toggle() } label: { Label("Tutor", systemImage: "graduationcap") }
+                .help("Show or hide the tutor (⇧⌘T)")
         }
         ToolbarItem(placement: .status) {
             HStack(spacing: 6) {

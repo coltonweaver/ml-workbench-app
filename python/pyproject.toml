@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Python side of ML Workbench: runs the learner's Jupyter kernel and test suites, speaks JSON lines over stdio."
 requires-python = ">=3.12"
 dependencies = [
+    "anthropic>=2.3.0",
     "ipykernel>=6.29",
     "jupyter_client>=8.6",
     "numpy>=2.0",

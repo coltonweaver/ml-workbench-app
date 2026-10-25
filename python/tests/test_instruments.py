@@ -111,3 +111,32 @@ def test_instruments_reach_the_protocol(tmp_path: Path) -> None:
         assert len(updates[-1]["data"][mime]["path"]) == 2
     finally:
         sidecar.close()
+
+
+def test_tensor_summary_shapes_and_stats() -> None:
+    import numpy as np
+    from workbench import tensor_summary
+
+    s = tensor_summary([[1.0, 2.0], [3.0, float("nan")]], "t", None, note="n")
+    assert s["shape"] == [2, 2] and s["count"] == 4 and s["non_finite"] == 1
+    assert s["stats"]["min"] == 1.0 and s["stats"]["max"] == 3.0 and s["stats"]["mean"] == 2.0
+    assert s["note"] == "n" and s["values"] == [1.0, 2.0, 3.0]
+    a = tensor_summary(np.zeros((3, 4, 5)), "z")
+    assert a["shape"] == [3, 4, 5] and a["stats"]["zeros"] == 60 and "values" not in a
+
+
+def test_payloads_carry_explain_with_provenance() -> None:
+    from workbench import graph_payload, landscape_payload
+
+    class V:
+        def __init__(self, data, prev=(), op=""):
+            self.data, self.grad, self._prev, self._op = data, 0.0, prev, op
+
+    g = graph_payload(V(3.0, (V(1.0), V(2.0)), "+"))
+    values = g["explain"][0]
+    assert values["shape"] == [3] and values["provenance"]["file"] == "test_instruments.py"
+    assert "graph_payload" in values["provenance"]["code"]
+    land = landscape_payload(lambda v: v[0] ** 2 + v[1] ** 2, ((-1, 1), (-2, 2)), n=5)
+    surface = land["explain"][0]
+    assert surface["shape"] == [5, 5] and surface["stats"]["min"] == 0.0
+    assert surface["axes"] == ["x in [-1, 1]", "y in [-2, 2]"]

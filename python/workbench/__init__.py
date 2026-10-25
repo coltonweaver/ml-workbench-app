@@ -17,7 +17,9 @@ place when its handle publishes again.
 
 from __future__ import annotations
 
+import inspect
 import math
+import os
 import random
 from collections.abc import Callable, Iterable, Sequence
 from typing import Any
@@ -26,7 +28,10 @@ GRAPH_MIME = "application/vnd.workbench.graph+json"
 LANDSCAPE_MIME = "application/vnd.workbench.landscape+json"
 MAX_GRAPH_NODES = 400
 
-__all__ = ["show_graph", "show_landscape", "show_slice", "graph_payload", "landscape_payload"]
+__all__ = ["show_graph", "show_landscape", "show_slice", "graph_payload", "landscape_payload",
+           "tensor_summary"]
+
+_PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 # ---- publishing -------------------------------------------------------------
@@ -55,6 +60,69 @@ def _publish(mime: str, payload: dict[str, Any], handle: Any) -> Any:
         return display(data, raw=True, display_id=True)
     handle.update(data, raw=True)
     return handle
+
+
+def _provenance() -> dict[str, Any] | None:
+    """Where the show_* call came from: the first frame outside this package."""
+    for frame in inspect.stack(context=1)[1:]:
+        filename = os.path.abspath(frame.filename)
+        if os.path.dirname(filename) == _PACKAGE_DIR:
+            continue
+        line = (frame.code_context or [""])[0].strip()
+        return {"file": os.path.basename(frame.filename), "line": frame.lineno,
+                "function": frame.function, "code": line}
+    return None
+
+
+def _flatten(values: Any) -> tuple[list[int], list[float]]:
+    """Shape and finite entries of a nested list, array or Value-likes."""
+    if hasattr(values, "shape") and hasattr(values, "ravel"):
+        shape = [int(d) for d in values.shape]
+        flat = [_num(v) for v in values.ravel().tolist()]
+        return shape, [v for v in flat if v is not None]
+    shape: list[int] = []
+    probe = values
+    while isinstance(probe, (list, tuple)):
+        shape.append(len(probe))
+        probe = probe[0] if probe else None
+    flat: list[float] = []
+
+    def walk(v: Any) -> None:
+        if isinstance(v, (list, tuple)):
+            for item in v:
+                walk(item)
+        else:
+            n = _num(v)
+            if n is not None:
+                flat.append(n)
+
+    walk(values)
+    return shape, flat
+
+
+def tensor_summary(values: Any, name: str, provenance: dict[str, Any] | None = None,
+                   **extra: Any) -> dict[str, Any]:
+    """What "Explain this tensor" sends to the tutor: shape, statistics and
+    where the tensor came from. Works on arrays, nested lists and Values."""
+    shape, flat = _flatten(values)
+    count = 1
+    for d in shape:
+        count *= d
+    summary: dict[str, Any] = {"name": name, "shape": shape, "count": count,
+                               "non_finite": count - len(flat)}
+    if flat:
+        mean = sum(flat) / len(flat)
+        var = sum((v - mean) ** 2 for v in flat) / len(flat)
+        summary["stats"] = {
+            "min": min(flat), "max": max(flat), "mean": mean, "std": math.sqrt(var),
+            "zeros": sum(1 for v in flat if v == 0.0),
+        }
+        if len(flat) <= 16:
+            summary["values"] = flat
+    if provenance is not None:
+        summary["provenance"] = provenance
+    summary.update(extra)
+    return summary
 
 
 def _num(x: Any) -> float | None:
@@ -112,7 +180,14 @@ def graph_payload(root: Any, title: str | None = None) -> dict[str, Any]:
         for child in getattr(n, "_prev", ())
     ]
     root_grad = _num(getattr(root, "grad", 0.0)) or 0.0
+    where = _provenance()
     return {
+        "explain": [
+            tensor_summary([n["data"] for n in nodes], "node values", where,
+                           note="every value in the graph, inputs first, root last"),
+            tensor_summary([n["grad"] for n in nodes], "node gradients", where,
+                           note="d(root)/d(node); all zero until root.backward() runs"),
+        ],
         "kind": "graph",
         "title": title,
         "nodes": nodes,
@@ -160,7 +235,13 @@ def landscape_payload(
         n = n or 201
         xs = _linspace(float(lo), float(hi), n)
         payload = {"dims": 1, "x": xs, "line": [_num(f(x)) for x in xs]}
+    surface = payload.get("grid", payload.get("line"))
     payload.update({
+        "explain": [tensor_summary(
+            surface, "loss surface", _provenance(),
+            axes=[f"{lab} in [{r[0]}, {r[1]}]" for lab, r in zip(
+                labels or (["x", "y"] if two_d else ["x"]),
+                ranges if two_d else [ranges])])],
         "kind": "landscape",
         "title": title,
         "labels": list(labels) if labels else (["x", "y"] if two_d else ["x"]),

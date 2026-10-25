@@ -40,9 +40,16 @@ struct MLWorkbenchApp: App {
                 Button("Stop") { model.interrupt() }
                     .keyboardShortcut(".")
                 Divider()
+                Button(model.showTutor ? "Hide Tutor" : "Show Tutor") { model.showTutor.toggle() }
+                    .keyboardShortcut("t", modifiers: [.command, .shift])
+                Divider()
                 Button("Restart Kernel") { model.restartKernel() }
                     .keyboardShortcut("0", modifiers: [.command, .shift])
             }
+        }
+        Settings {
+            SettingsView()
+                .environmentObject(model)
         }
     }
 }

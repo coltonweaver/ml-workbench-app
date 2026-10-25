@@ -6,6 +6,8 @@ struct InstrumentItem: Identifiable, Equatable {
     /// The display id, so a later update replaces the same widget.
     let id: String
     var instrument: Instrument
+    /// Tensor summaries for "Explain this tensor".
+    var explain: [JSONValue] = []
 }
 
 struct OutputChunk: Identifiable, Equatable {
@@ -68,6 +70,12 @@ final class AppModel: ObservableObject {
 
     enum OutputTab: Hashable { case output, tests, instruments }
 
+    // Tutor
+    @Published private(set) var tutor = TutorChat()
+    @Published var tutorDraft = ""
+    @Published var showTutor = false
+    @Published private(set) var hasAPIKey = false
+
     func clearInstruments() {
         instruments.removeAll()
     }
@@ -84,6 +92,7 @@ final class AppModel: ObservableObject {
     // MARK: Lifecycle
 
     func start() {
+        refreshAPIKeyStatus()
         do {
             try workspace.prepare()
             refreshFiles()
@@ -275,9 +284,97 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: Tutor
+
+    /// Asks the tutor `question`, or what's in the draft. With `tensor`, the
+    /// question is about that tensor summary.
+    func askTutor(_ question: String? = nil, tensor: JSONValue? = nil) {
+        let text = (question ?? tutorDraft).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !tutor.isAnswering else { return }
+        showTutor = true
+        guard let client else {
+            errorMessage = "The Python sidecar isn't running, so the tutor can't be reached. Restart the kernel."
+            return
+        }
+        let key: String?
+        do {
+            key = try KeychainItem.apiKey.read()
+        } catch {
+            errorMessage = error.localizedDescription
+            return
+        }
+        // The open lesson's file goes as typed, saved or not.
+        let code: String? = if let lesson {
+            selectedFile == lesson.file ? editorText : nil
+        } else {
+            selectedFile != nil ? editorText : nil
+        }
+        let history = tutor.history
+        do {
+            let id = try client.askTutor(
+                question: text, history: history, apiKey: key, lesson: lesson?.id, code: code, tensor: tensor
+            )
+            tutor.ask(text, request: id)
+            if question == nil { tutorDraft = "" }
+        } catch {
+            errorMessage = "Couldn't reach the sidecar: \(error.localizedDescription)"
+        }
+    }
+
+    func explain(_ summary: JSONValue) {
+        askTutor("Explain this tensor: \(summary.name ?? "tensor")", tensor: summary)
+    }
+
+    func stopTutor() {
+        try? client?.cancelTutor()
+    }
+
+    func clearTutor() {
+        stopTutor()
+        tutor.clear()
+    }
+
+    func refreshAPIKeyStatus() {
+        let stored = (try? KeychainItem.apiKey.read()).flatMap { $0 }
+        hasAPIKey = !(stored ?? "").isEmpty || ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"] != nil
+    }
+
+    func saveAPIKey(_ key: String) {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            if trimmed.isEmpty {
+                try KeychainItem.apiKey.delete()
+            } else {
+                try KeychainItem.apiKey.save(trimmed)
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        refreshAPIKeyStatus()
+    }
+
+    private func handleTutor(_ event: SidecarEvent, request: String) {
+        switch event.kind {
+        case .tutorDelta:
+            tutor.receive(delta: event.text ?? "", request: request)
+        case .tutorDone:
+            tutor.finish(request: request, stopReason: event.stopReason, note: event.note)
+        case .error:
+            tutor.fail(request: request, message: event.evalue ?? "The tutor failed.")
+        case .done:
+            tutor.end(request: request)
+        default:
+            break
+        }
+    }
+
     // MARK: Events
 
     private func handle(_ event: SidecarEvent) {
+        if let id = event.id, id == tutor.activeRequest {
+            handleTutor(event, request: id)
+            return
+        }
         switch event.kind {
         case .ready:
             kernelState = .idle
@@ -299,7 +396,8 @@ final class AppModel: ObservableObject {
             append(event.name == "stderr" ? .stderr : .stdout, event.text ?? "")
         case .executeResult, .displayData, .updateDisplayData:
             if let data = event.data, let instrument = Instrument(data: data) {
-                show(instrument, displayID: event.displayID, isUpdate: event.kind == .updateDisplayData)
+                show(instrument, explain: Instrument.explainSummaries(data: data),
+                     displayID: event.displayID, isUpdate: event.kind == .updateDisplayData)
             } else if event.kind != .updateDisplayData, let text = event.plainText {
                 append(.result, text + "\n")
             }
@@ -313,18 +411,21 @@ final class AppModel: ObservableObject {
             append(.error, text)
         case .testReport:
             testReport = event.testReport
+        case .tutorDelta, .tutorDone:
+            break  // a stopped answer's stragglers
         case .done:
             if let id = event.id { pending.remove(id) }
             if pending.isEmpty, kernelState == .busy { kernelState = .idle }
         }
     }
 
-    private func show(_ instrument: Instrument, displayID: String?, isUpdate: Bool) {
+    private func show(_ instrument: Instrument, explain: [JSONValue], displayID: String?, isUpdate: Bool) {
         let id = displayID ?? UUID().uuidString
         if let index = instruments.firstIndex(where: { $0.id == id }) {
             instruments[index].instrument = instrument
+            instruments[index].explain = explain
         } else if !isUpdate {
-            instruments.insert(InstrumentItem(id: id, instrument: instrument), at: 0)
+            instruments.insert(InstrumentItem(id: id, instrument: instrument, explain: explain), at: 0)
             outputTab = .instruments
         }
     }

@@ -346,6 +346,9 @@ class LessonService:
         progress.save()
         return self.detail(lesson_id)
 
+    def mistakes(self) -> list[dict[str, Any]]:
+        return list(self._progress().data.get("mistakes", []))
+
     def record_check(self, lesson_id: str, report: dict[str, Any]) -> bool:
         """Update progress after a hidden-test run. Returns True on a new pass."""
         lesson = self.catalog.lesson(lesson_id)
