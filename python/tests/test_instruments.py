@@ -327,3 +327,26 @@ def test_timeline_payload() -> None:
         timeline_payload(["a"], [span(1, 0, 1)])
     with pytest.raises(ValueError):
         span(0, 2, 1)
+
+
+def _rank_sum(rank, world):
+    import torch
+    import torch.distributed as dist
+
+    t = torch.tensor([float(rank + 1)])
+    dist.all_reduce(t)
+    return rank, world, t.item()
+
+
+def _boom(rank, world):
+    if rank == 1:
+        raise ValueError("rank 1 exploded")
+    return rank
+
+
+def test_dist_launch() -> None:
+    from workbench.dist import launch
+
+    assert launch(_rank_sum, 3) == [(0, 3, 6.0), (1, 3, 6.0), (2, 3, 6.0)]
+    with pytest.raises(RuntimeError, match="rank 1 exploded"):
+        launch(_boom, 2, timeout=60)

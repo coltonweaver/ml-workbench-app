@@ -1,0 +1,8 @@
+id: m08
+number: 8
+title: Training at scale
+summary: >
+  Simulate a multi-GPU job with processes on your Mac: write ring
+  all-reduce from sends and receives, then data, tensor and pipeline
+  parallelism, mixed precision with loss scaling, and checkpointing,
+  failure recovery and stragglers.

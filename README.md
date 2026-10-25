@@ -10,9 +10,9 @@ The full spec lives in the "Hands-on ML tutorial app: spec" doc.
 
 ## Status
 
-Milestones 1 to 5 of the build plan: the app shell, kernel bridge,
-file-backed editor and Run/Test buttons, plus the lesson flow and all of
-module 1 (gradient descent through a working autograd engine and MLP).
+All eight modules of the build plan are in: the app shell, kernel bridge,
+file-backed editor and Run/Test buttons, the lesson flow, and module 1
+(gradient descent through a working autograd engine and MLP) onward.
 
 Milestone 3 adds the first instruments, which draw what your own code
 computed: a computation graph you can step through (values forward, gradients
@@ -87,6 +87,13 @@ allocator, speculative decoding (exact rejection sampling and a greedy
 version with a real draft model), and a serving simulator that combines
 continuous batching, paged memory and preemption, drawn with
 `show_timeline` (request lanes, KV memory and batch size over time).
+
+Module 8 is training at scale, run for real across processes on your Mac:
+naive and ring all-reduce, data parallelism that matches a single-process
+run to the last bit, Megatron-style tensor parallelism of the MLP, GPipe
+schedules and the pipeline bubble, fp16 underflow and loss scaling, and
+checkpointing, crashes, stragglers and backup workers. `workbench.dist.launch(fn, world_size)`
+starts the ranks (gloo on localhost) and returns what each one returned.
 
 Lessons live in [`content/`](content/README.md) as Markdown with YAML front
 matter. Each lesson goes problem, prediction, build, hidden-test check, then
