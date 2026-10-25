@@ -36,6 +36,16 @@ time. Paths that resolve outside the workspace are refused. Lesson errors (an
 unknown lesson, an invalid prediction) come back as an `error` event with
 `ename` `LessonError`.
 
+## Instruments
+
+The `workbench` package (in `python/workbench`) is importable in the kernel.
+`show_graph`, `show_landscape` and `show_slice` publish IPython displays with
+the MIME types `application/vnd.workbench.graph+json` and
+`application/vnd.workbench.landscape+json`. The sidecar forwards those keys
+untouched; the app draws them in the Instruments tab and applies
+`update_display_data` to the widget with the same `display_id`. Non-finite
+numbers are sent as null.
+
 ## Events (sidecar → app)
 
 | type             | fields |
@@ -43,7 +53,8 @@ unknown lesson, an invalid prediction) come back as an `error` event with
 | `ready`          | `protocol`, `python`, `workspace`. Sent once, after the kernel is up. |
 | `stream`         | `name` (`stdout`/`stderr`), `text` |
 | `execute_result` | `data` (MIME bundle: `text/plain`, `text/markdown`, `image/png`, `application/json`) |
-| `display_data`   | `data`, as above |
+| `display_data`   | `data`, as above; `display_id` when the display can be updated |
+| `update_display_data` | `data` and `display_id`: replace that display's content in place |
 | `error`          | `ename`, `evalue`, `traceback` (list of lines, may contain ANSI colour codes) |
 | `test_report`    | `outcome` (`passed`, `failed`, `no_tests`, `timeout`, `cancelled`, `error`), `exit_code`, `passed`, `failed`, `tests` (list of `{nodeid, outcome, duration, message}`), `output` (pytest's console text) |
 | `lessons`        | `modules`: list of `{id, number, title, summary, lessons: [{id, title, status}]}`; status is `new`, `in_progress` or `passed` |

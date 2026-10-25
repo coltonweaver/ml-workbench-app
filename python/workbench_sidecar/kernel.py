@@ -57,8 +57,12 @@ class KernelSession:
             content = msg["content"]
             if kind == "stream":
                 emit({"type": "stream", "name": content["name"], "text": content["text"]})
-            elif kind in ("execute_result", "display_data"):
-                emit({"type": kind, "data": _text_data(content["data"])})
+            elif kind in ("execute_result", "display_data", "update_display_data"):
+                event = {"type": kind, "data": _text_data(content["data"])}
+                display_id = content.get("transient", {}).get("display_id")
+                if display_id:
+                    event["display_id"] = display_id
+                emit(event)
             elif kind == "error":
                 status = "error"
                 emit({"type": "error", "ename": content["ename"],
@@ -89,6 +93,8 @@ class KernelSession:
 
 
 def _text_data(data: dict[str, Any]) -> dict[str, Any]:
-    """Keep the MIME types the app can render today."""
+    """Keep the MIME types the app can render: plain formats plus the
+    instrument payloads published by the ``workbench`` helper."""
     keep = ("text/plain", "text/markdown", "image/png", "application/json")
-    return {k: v for k, v in data.items() if k in keep}
+    return {k: v for k, v in data.items()
+            if k in keep or k.startswith("application/vnd.workbench.")}

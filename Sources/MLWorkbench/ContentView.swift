@@ -176,15 +176,17 @@ private struct OutputPane: View {
             Picker("", selection: $model.outputTab) {
                 Text("Output").tag(AppModel.OutputTab.output)
                 Text("Tests").tag(AppModel.OutputTab.tests)
+                Text("Instruments").tag(AppModel.OutputTab.instruments)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(maxWidth: 220)
+            .frame(maxWidth: 330)
             .padding(6)
             Divider()
             switch model.outputTab {
             case .output: OutputLog(chunks: model.output)
             case .tests: TestResults(report: model.testReport, running: model.kernelState == .busy)
+            case .instruments: InstrumentsPane()
             }
         }
         .background(Color(nsColor: .underPageBackgroundColor))

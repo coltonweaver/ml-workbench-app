@@ -57,6 +57,21 @@ path = descend_many(f, [5, 5], 0.04, 30)
 [p for p in path[::5]]
 ```
 
+Then look at it from above. The probe's arrow points downhill:
+
+```python
+from workbench import show_landscape
+show_landscape(f, ((-6, 6), (-6, 6)), path=path, labels=["x", "y"])
+```
+
+Or watch it live, one step at a time:
+
+```python
+h = show_landscape(f, ((-6, 6), (-6, 6)))
+for p in descend_many(f, [5, 5], 0.09, 25):
+    h.add(p)
+```
+
 ## Explain
 
 Each one-knob slope is a **partial derivative**, written ∂f/∂x. The list of

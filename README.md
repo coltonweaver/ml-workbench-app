@@ -10,9 +10,18 @@ The full spec lives in the "Hands-on ML tutorial app: spec" doc.
 
 ## Status
 
-Milestones 1 and 2 of the build plan: the app shell, kernel bridge,
+Milestones 1 to 3 of the build plan: the app shell, kernel bridge,
 file-backed editor and Run/Test buttons, plus the lesson flow and all of
 module 1 (gradient descent through a working autograd engine and MLP).
+
+Milestone 3 adds the first instruments, which draw what your own code
+computed: a computation graph you can step through (values forward, gradients
+backward) and 1D/2D loss landscapes with the optimizer's path drawn live and a
+draggable probe. From the kernel:
+
+```python
+from workbench import show_graph, show_landscape, show_slice
+```
 
 Lessons live in [`content/`](content/README.md) as Markdown with YAML front
 matter. Each lesson goes problem, prediction, build, hidden-test check, then

@@ -61,6 +61,13 @@ for you; they're what Python calls for `1 + a`.)
 
 Leave `backward` and the rest alone for now.
 
+Once it works, draw the graph you built (Instruments tab):
+
+```python
+from workbench import show_graph
+show_graph(e, title="e = a*b + c")
+```
+
 ## Explain
 
 You've built a **computation graph**: a directed acyclic graph whose leaves are

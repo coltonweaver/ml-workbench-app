@@ -50,6 +50,14 @@ descend(f, 10, 0.9, 20)       # look at the whole path
 descend(f, 10, 1.1, 20)       # and this one
 ```
 
+To *see* the walk, draw it on the landscape (it opens in the Instruments tab;
+drag on the plot to probe the slope anywhere):
+
+```python
+from workbench import show_landscape
+show_landscape(f, (0, 14), path=descend(f, 10, 0.9, 20), title="lr = 0.9")
+```
+
 ## Explain
 
 This is **gradient descent**, and `lr` is the **learning rate**. Cauchy

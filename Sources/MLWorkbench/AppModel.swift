@@ -2,6 +2,12 @@ import Foundation
 import SwiftUI
 import WorkbenchCore
 
+struct InstrumentItem: Identifiable, Equatable {
+    /// The display id, so a later update replaces the same widget.
+    let id: String
+    var instrument: Instrument
+}
+
 struct OutputChunk: Identifiable, Equatable {
     enum Style { case stdout, stderr, result, error, info }
     let id = UUID()
@@ -45,6 +51,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var isDirty = false
     @Published private(set) var output: [OutputChunk] = []
     @Published private(set) var testReport: TestReport?
+    /// Newest first.
+    @Published private(set) var instruments: [InstrumentItem] = []
     @Published private(set) var kernelState: KernelState = .stopped
     @Published var outputTab: OutputTab = .output
     @Published var errorMessage: String?
@@ -58,7 +66,11 @@ final class AppModel: ObservableObject {
         didSet { if selection != oldValue { selectionChanged() } }
     }
 
-    enum OutputTab: Hashable { case output, tests }
+    enum OutputTab: Hashable { case output, tests, instruments }
+
+    func clearInstruments() {
+        instruments.removeAll()
+    }
 
     private var savedText = ""
     private var client: SidecarClient?
@@ -285,8 +297,12 @@ final class AppModel: ObservableObject {
             }
         case .stream:
             append(event.name == "stderr" ? .stderr : .stdout, event.text ?? "")
-        case .executeResult, .displayData:
-            if let text = event.plainText { append(.result, text + "\n") }
+        case .executeResult, .displayData, .updateDisplayData:
+            if let data = event.data, let instrument = Instrument(data: data) {
+                show(instrument, displayID: event.displayID, isUpdate: event.kind == .updateDisplayData)
+            } else if event.kind != .updateDisplayData, let text = event.plainText {
+                append(.result, text + "\n")
+            }
         case .error where event.ename == "LessonError":
             errorMessage = event.evalue
         case .error:
@@ -300,6 +316,16 @@ final class AppModel: ObservableObject {
         case .done:
             if let id = event.id { pending.remove(id) }
             if pending.isEmpty, kernelState == .busy { kernelState = .idle }
+        }
+    }
+
+    private func show(_ instrument: Instrument, displayID: String?, isUpdate: Bool) {
+        let id = displayID ?? UUID().uuidString
+        if let index = instruments.firstIndex(where: { $0.id == id }) {
+            instruments[index].instrument = instrument
+        } else if !isUpdate {
+            instruments.insert(InstrumentItem(id: id, instrument: instrument), at: 0)
+            outputTab = .instruments
         }
     }
 

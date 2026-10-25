@@ -56,6 +56,14 @@ L.backward()
 a.grad, b.grad
 ```
 
+Then step through it. Press play on the graph to watch the values flow
+forward and the gradients flow back:
+
+```python
+from workbench import show_graph
+show_graph(L, title="L = a*b + a")
+```
+
 ## Explain
 
 The rule you applied at each node is the **chain rule**: if L depends on d,

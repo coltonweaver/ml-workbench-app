@@ -58,6 +58,17 @@ losses[0], losses[-1]
 [model(x).data for x in xs]
 ```
 
+What does the loss look like around the weights you found? `show_slice`
+evaluates it along two random directions through the current parameters:
+
+```python
+from workbench import show_slice
+loss = lambda: sum(((model(x) - y) ** 2 for x, y in zip(xs, ys)), Value(0.0))
+show_slice(loss, model.parameters(), span=0.5)
+```
+
+(`Value` comes from `m01.engine`.) Try it before training as well as after.
+
 ## Explain
 
 You built a **multilayer perceptron**. Neurons in layers, with a nonlinearity
