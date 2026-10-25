@@ -16,6 +16,10 @@ m01-backprop/
     test_slope.py          hidden tests, run against the learner's workspace
 ```
 
+Modules build on each other: `m03` imports the tensor engine from `m02`.
+The content tests give each lesson a workspace holding the solutions of its
+module and every earlier one.
+
 A stub is copied only when the learner's file doesn't exist yet, so several
 lessons can share one file (lessons 1.4 to 1.6 all build `m01/engine.py`).
 Solution and stub files are matched to a lesson by the file name in its

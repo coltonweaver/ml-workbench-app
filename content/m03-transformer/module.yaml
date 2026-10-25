@@ -1,0 +1,7 @@
+id: m03
+number: 3
+title: Transformer and a small GPT
+summary: >
+  Self-attention by hand, multi-head attention, layer norm, the MLP block,
+  positions and the residual stream, assembled into a GPT that you train on
+  a corpus on your own engine, then rebuild in PyTorch and check against it.

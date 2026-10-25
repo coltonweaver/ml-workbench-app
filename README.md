@@ -10,7 +10,7 @@ The full spec lives in the "Hands-on ML tutorial app: spec" doc.
 
 ## Status
 
-Milestones 1 to 4 of the build plan: the app shell, kernel bridge,
+Milestones 1 to 5 of the build plan: the app shell, kernel bridge,
 file-backed editor and Run/Test buttons, plus the lesson flow and all of
 module 1 (gradient descent through a working autograd engine and MLP).
 
@@ -40,6 +40,12 @@ training dashboard (loss and validation curves, gradient norms per layer,
 learning rate, tokens/sec), the embedding explorer (PCA of any embedding
 table, colored by token class) and a heatmap. The attention viewer is ready
 for module 3. Bundled data: `from workbench.data import names, shakespeare`.
+
+Module 3 builds self-attention, multi-head attention, layer norm, the MLP
+block and the residual stream on that engine, assembles a GPT, trains it on
+tiny Shakespeare (or any text file: `workbench.data.corpus(path)`), then
+rebuilds it in PyTorch and checks the two agree to about 1e-15 before
+training a bigger one on the Apple GPU (MPS).
 
 ```python
 from workbench import show_training, show_embeddings, show_attention, show_matrix, grad_norms
