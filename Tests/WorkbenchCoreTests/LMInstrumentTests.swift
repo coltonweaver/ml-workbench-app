@@ -84,3 +84,73 @@ final class ImageInstrumentTests: XCTestCase {
         XCTAssertEqual(p.images[0].range, [-1, 1])
     }
 }
+
+final class InterpInstrumentTests: XCTestCase {
+    private func decode(_ json: String) throws -> Instrument? {
+        Instrument(data: try JSONDecoder().decode([String: JSONValue].self, from: Data(json.utf8)))
+    }
+
+    func testFeaturesPayload() throws {
+        let json = """
+        {"application/vnd.workbench.features+json": {"kind": "features", "title": "SAE", "explain": [],
+          "features": [{"id": 3, "label": null, "density": 0.25, "max_act": 2.0,
+                        "examples": [{"tokens": ["g", "h"], "acts": [0.5, 2.0], "highlight": 1}],
+                        "up": [{"token": "h", "value": 1.5}], "down": []}]}}
+        """
+        guard case .features(let p)? = try decode(json) else { return XCTFail("not decoded") }
+        XCTAssertEqual(p.features[0].maxAct, 2.0)
+        XCTAssertEqual(p.features[0].name, "#3")
+        XCTAssertEqual(p.features[0].examples[0].highlight, 1)
+    }
+
+    func testAttributionPayload() throws {
+        let json = """
+        {"application/vnd.workbench.attribution+json": {"kind": "attribution", "title": null, "explain": [],
+          "tokens": ["a", "b"], "components": ["emb", "a0"], "values": [[1, -3], [2, null]],
+          "target": {"pos": 1, "token": "c"},
+          "graph": {"nodes": [{"component": 0, "pos": 0, "effect": 1}, {"component": 1, "pos": 1, "effect": -2}],
+                    "edges": [{"source": 0, "target": 1, "weight": 0.5}]}}}
+        """
+        guard case .attribution(let p)? = try decode(json) else { return XCTFail("not decoded") }
+        XCTAssertEqual(p.maxMagnitude, 3)
+        XCTAssertEqual(p.totals, [3, -3])
+        XCTAssertEqual(p.graph?.edges.first?.target, 1)
+        XCTAssertEqual(signedFraction(-6, magnitude: 3), -1)
+        XCTAssertEqual(Instrument.attribution(p).title, "Logit attribution")
+    }
+}
+
+final class ChartInstrumentTests: XCTestCase {
+    private func decode(_ json: String) throws -> Instrument? {
+        Instrument(data: try JSONDecoder().decode([String: JSONValue].self, from: Data(json.utf8)))
+    }
+
+    func testPlotPayload() throws {
+        let json = """
+        {"application/vnd.workbench.plot+json": {"kind": "plot", "title": "scaling", "x_label": "N", "y_label": null,
+          "log_x": true, "log_y": false, "explain": [],
+          "series": [{"name": "data", "kind": "scatter", "x": [0, 10, 100], "y": [3, null, 2]}]}}
+        """
+        guard case .plot(let p)? = try decode(json) else { return XCTFail("not decoded") }
+        XCTAssertTrue(p.logX)
+        XCTAssertEqual(p.series[0].points(logX: true), [PlotSeries.Point(x: 100, y: 2)],
+                       "x = 0 can't go on a log axis and a null y is skipped")
+        XCTAssertEqual(p.series[0].points().count, 2)
+    }
+
+    func testTimelinePayload() throws {
+        let json = """
+        {"application/vnd.workbench.timeline+json": {"kind": "timeline", "title": null, "unit": "ms", "explain": [],
+          "lanes": ["a", "b"], "metrics": {"bubble": 0.25},
+          "spans": [{"lane": 0, "start": 0, "end": 2, "label": "F0", "kind": "forward"},
+                    {"lane": 1, "start": 2, "end": 4, "label": null, "kind": "backward"},
+                    {"lane": 1, "start": 0, "end": 1, "label": null, "kind": "forward"}],
+          "below": []}}
+        """
+        guard case .timeline(let t)? = try decode(json) else { return XCTFail("not decoded") }
+        XCTAssertEqual(t.timeRange, 0...4)
+        XCTAssertEqual(t.kinds, ["forward", "backward"])
+        XCTAssertEqual(t.utilization, 5.0 / 8.0, accuracy: 1e-12)
+        XCTAssertEqual(t.metrics["bubble"], 0.25)
+    }
+}

@@ -58,6 +58,20 @@ gradient ascent on the input, top-activating dataset examples, and reading
 and ablating a circuit between two layers. `show_images` draws image grids
 (grayscale or RGB) for all of it.
 
+Module 5 opens up your GPT: a forward pass with named hook points to read
+and patch, the logit lens and direct logit attribution, activation
+patching, induction heads (trained and found), toy models of
+superposition, a sparse autoencoder on your own residual stream, steering
+vectors, attribution graphs, and a capstone that critiques an
+interpretability claim with experiments. Two instruments come with it: a
+feature browser (pick a feature or neuron; its top contexts are shaded by
+activation, with the tokens it promotes and suppresses) and the attribution
+view (component × token heatmap plus the pruned attribution graph).
+
+```python
+from workbench import feature_card, show_features, show_attribution
+```
+
 Lessons live in [`content/`](content/README.md) as Markdown with YAML front
 matter. Each lesson goes problem, prediction, build, hidden-test check, then
 the explanation. Progress is kept in `progress.json` in your workspace, and

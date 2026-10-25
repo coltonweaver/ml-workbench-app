@@ -44,6 +44,14 @@ struct InstrumentsPane: View {
                                 MatrixInstrumentView(matrix: matrix)
                             case .images(let images):
                                 ImagesInstrumentView(payload: images)
+                            case .features(let features):
+                                FeatureBrowserView(payload: features)
+                            case .attribution(let attribution):
+                                AttributionInstrumentView(payload: attribution)
+                            case .plot(let plot):
+                                PlotInstrumentView(payload: plot)
+                            case .timeline(let timeline):
+                                TimelineInstrumentView(payload: timeline)
                             }
                         }
                         .padding(10)

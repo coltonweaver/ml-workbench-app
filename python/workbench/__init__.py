@@ -357,3 +357,11 @@ __all__ += ["grad_norms", "pca", "show_attention", "show_embeddings", "show_matr
 from .vision import show_images  # noqa: E402
 
 __all__ += ["show_images"]
+
+from .interp import feature_card, show_attribution, show_features  # noqa: E402
+
+__all__ += ["feature_card", "show_attribution", "show_features"]
+
+from .charts import series, show_plot, show_timeline, span  # noqa: E402
+
+__all__ += ["series", "show_plot", "show_timeline", "span"]

@@ -1,0 +1,9 @@
+id: m05
+number: 5
+title: Mechanistic interpretability
+summary: >
+  Open up your GPT: a forward pass with named hook points, the logit lens
+  and direct logit attribution, activation patching, induction heads, toy
+  models of superposition, a sparse autoencoder on your own residual stream
+  with a feature browser, steering vectors, attribution graphs, and a
+  capstone where you critique an interpretability claim with experiments.

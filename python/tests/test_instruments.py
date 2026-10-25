@@ -269,3 +269,61 @@ def test_shapes_dataset() -> None:
     assert 0 <= X.min() and X.max() <= 1 and set(Y) <= set(range(len(SHAPE_CLASSES)))
     X2, Y2 = shapes(120, seed=1)
     assert np.array_equal(X, X2) and np.array_equal(Y, Y2), "same seed, same data"
+
+
+def test_feature_card_and_payload() -> None:
+    import numpy as np
+    from workbench.interp import feature_card, features_payload
+
+    idx = np.array([[1, 2, 3, 4], [5, 6, 7, 8]])
+    contexts = [{"row": 1, "start": 1, "pos": 3, "act": 2.0, "acts": [0.0, 0.5, 2.0]},
+                {"row": 0, "start": 0, "pos": 1, "act": 1.0, "acts": [0.1, 1.0]}]
+    card = feature_card(3, contexts, idx, decode=lambda i: "abcdefghi"[i],
+                        up=([7, 8], [1.5, 1.0]), down=([1], [-2.0]), density=0.25)
+    assert card["examples"][0]["tokens"] == ["g", "h", "i"]
+    assert card["examples"][0]["highlight"] == 2 and card["max_act"] == 2.0
+    assert card["up"][0] == {"token": "h", "value": 1.5} and card["down"][0]["value"] == -2.0
+    p = features_payload([card], title="SAE")
+    assert p["kind"] == "features" and p["features"][0]["id"] == 3 and p["explain"]
+
+
+def test_attribution_payload() -> None:
+    import numpy as np
+    from workbench.interp import attribution_payload
+
+    v = np.arange(6, dtype=float).reshape(3, 2)
+    p = attribution_payload(["a", "b"], ["emb", "a0", "m0"], v, target=(1, "c"),
+                            nodes=[(0, 0, 1.0), (2, 1, -0.5)], edges=[(0, 0, 2, 1, 0.3), (1, 1, 2, 1, 9.0)])
+    assert p["values"][2] == [4.0, 5.0] and p["target"] == {"pos": 1, "token": "c"}
+    assert p["graph"]["edges"] == [{"source": 0, "target": 1, "weight": 0.3}], "edges to dropped nodes go"
+    assert attribution_payload(["a", "b"], ["x", "y", "z"], v)["graph"] is None
+    with pytest.raises(ValueError):
+        attribution_payload(["a"], ["x"], v)
+
+
+def test_plot_payload() -> None:
+    import numpy as np
+    from workbench.charts import plot_payload, series
+
+    s = series("fit", [1, 10, 100], np.array([3.0, 2.0, float("nan")]))
+    assert s["y"] == [3.0, 2.0, None] and s["kind"] == "line"
+    p = plot_payload([s, series("data", [1, 2], [1, 1], kind="scatter")], log_x=True, x_label="N")
+    assert p["kind"] == "plot" and p["log_x"] and not p["log_y"] and len(p["series"]) == 2
+    with pytest.raises(ValueError):
+        plot_payload([series("bad", [0, 1], [1, 2])], log_x=True)
+    with pytest.raises(ValueError):
+        series("x", [1, 2], [1])
+    assert len(series("long", np.arange(12000), np.arange(12000))["x"]) <= 5000
+
+
+def test_timeline_payload() -> None:
+    from workbench.charts import series, span, timeline_payload
+
+    p = timeline_payload(["a", "b"], [span(0, 0, 1, "F0", "forward"), span(1, 1, 3)],
+                         metrics={"bubble": 0.25}, below=[series("mem", [0, 1], [2, 3])])
+    assert p["spans"][1] == {"lane": 1, "start": 1.0, "end": 3.0, "label": None, "kind": None}
+    assert p["metrics"] == {"bubble": 0.25} and p["below"][0]["name"] == "mem"
+    with pytest.raises(ValueError):
+        timeline_payload(["a"], [span(1, 0, 1)])
+    with pytest.raises(ValueError):
+        span(0, 2, 1)

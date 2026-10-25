@@ -9,6 +9,10 @@ public enum Instrument: Equatable, Sendable {
     case attention(AttentionPayload)
     case matrix(MatrixPayload)
     case images(ImagesPayload)
+    case features(FeaturesPayload)
+    case attribution(AttributionPayload)
+    case plot(PlotPayload)
+    case timeline(TimelinePayload)
 
     public static let graphMIME = "application/vnd.workbench.graph+json"
     public static let landscapeMIME = "application/vnd.workbench.landscape+json"
@@ -17,6 +21,10 @@ public enum Instrument: Equatable, Sendable {
     public static let attentionMIME = "application/vnd.workbench.attention+json"
     public static let matrixMIME = "application/vnd.workbench.matrix+json"
     public static let imagesMIME = "application/vnd.workbench.images+json"
+    public static let featuresMIME = "application/vnd.workbench.features+json"
+    public static let attributionMIME = "application/vnd.workbench.attribution+json"
+    public static let plotMIME = "application/vnd.workbench.plot+json"
+    public static let timelineMIME = "application/vnd.workbench.timeline+json"
 
     /// Picks the instrument out of a display's MIME bundle, if it has one.
     public init?(data: [String: JSONValue]) {
@@ -34,6 +42,14 @@ public enum Instrument: Equatable, Sendable {
             self = .matrix(payload)
         } else if let value = data[Self.imagesMIME], let payload = try? value.decode(ImagesPayload.self) {
             self = .images(payload)
+        } else if let value = data[Self.featuresMIME], let payload = try? value.decode(FeaturesPayload.self) {
+            self = .features(payload)
+        } else if let value = data[Self.attributionMIME], let payload = try? value.decode(AttributionPayload.self) {
+            self = .attribution(payload)
+        } else if let value = data[Self.plotMIME], let payload = try? value.decode(PlotPayload.self) {
+            self = .plot(payload)
+        } else if let value = data[Self.timelineMIME], let payload = try? value.decode(TimelinePayload.self) {
+            self = .timeline(payload)
         } else {
             return nil
         }
@@ -59,6 +75,10 @@ public enum Instrument: Equatable, Sendable {
         case .attention(let a): a.title ?? "Attention"
         case .matrix(let m): m.title ?? "Matrix"
         case .images(let i): i.title ?? "Images"
+        case .features(let f): f.title ?? "Features"
+        case .attribution(let a): a.title ?? "Logit attribution"
+        case .plot(let p): p.title ?? "Plot"
+        case .timeline(let t): t.title ?? "Timeline"
         }
     }
 }
@@ -414,4 +434,174 @@ public struct ImagesPayload: Codable, Equatable, Sendable {
 
     public var title: String?
     public var images: [Image]
+}
+
+// MARK: Feature browser
+
+public struct FeaturesPayload: Codable, Equatable, Sendable {
+    public struct TokenValue: Codable, Equatable, Sendable {
+        public var token: String
+        public var value: Double
+    }
+
+    public struct Example: Codable, Equatable, Sendable {
+        public var tokens: [String]
+        public var acts: [Double?]
+        /// The token the example was picked for (the activation peak).
+        public var highlight: Int
+    }
+
+    public struct Feature: Codable, Equatable, Sendable, Identifiable {
+        public var id: Int
+        public var label: String?
+        public var density: Double?
+        public var maxAct: Double
+        public var examples: [Example]
+        public var up: [TokenValue]
+        public var down: [TokenValue]
+
+        enum CodingKeys: String, CodingKey {
+            case id, label, density, examples, up, down
+            case maxAct = "max_act"
+        }
+
+        public var name: String { label.map { "#\(id) \($0)" } ?? "#\(id)" }
+    }
+
+    public var title: String?
+    public var features: [Feature]
+}
+
+// MARK: Logit attribution
+
+public struct AttributionPayload: Codable, Equatable, Sendable {
+    public struct Target: Codable, Equatable, Sendable {
+        public var pos: Int
+        public var token: String
+    }
+
+    public struct Node: Codable, Equatable, Sendable {
+        public var component: Int
+        public var pos: Int
+        public var effect: Double
+    }
+
+    public struct Edge: Codable, Equatable, Sendable {
+        public var source: Int
+        public var target: Int
+        public var weight: Double
+    }
+
+    public struct Graph: Codable, Equatable, Sendable {
+        public var nodes: [Node]
+        public var edges: [Edge]
+    }
+
+    public var title: String?
+    public var tokens: [String]
+    public var components: [String]
+    /// values[component][token]
+    public var values: [[Double?]]
+    public var target: Target?
+    public var graph: Graph?
+
+    /// The largest |value|, for a symmetric color scale (at least a tiny
+    /// positive number so all-zero input still draws).
+    public var maxMagnitude: Double {
+        max(values.flatMap { $0.compactMap { $0.map(abs) } }.max() ?? 0, 1e-12)
+    }
+
+    /// Each token's total over components.
+    public var totals: [Double] {
+        tokens.indices.map { t in values.reduce(0) { $0 + (t < $1.count ? ($1[t] ?? 0) : 0) } }
+    }
+}
+
+/// -1...1 for a diverging color scale centred on 0.
+public func signedFraction(_ value: Double, magnitude: Double) -> Double {
+    guard magnitude > 0 else { return 0 }
+    return min(max(value / magnitude, -1), 1)
+}
+
+// MARK: Plot
+
+public struct PlotSeries: Codable, Equatable, Sendable {
+    public var name: String
+    /// "line" or "scatter".
+    public var kind: String
+    public var x: [Double?]
+    public var y: [Double?]
+
+    public struct Point: Equatable, Sendable {
+        public var x: Double
+        public var y: Double
+    }
+
+    /// The finite (x, y) pairs, skipping any that a log axis can't show.
+    public func points(logX: Bool = false, logY: Bool = false) -> [Point] {
+        zip(x, y).compactMap { px, py in
+            guard let px, let py, px.isFinite, py.isFinite else { return nil }
+            if (logX && px <= 0) || (logY && py <= 0) { return nil }
+            return Point(x: px, y: py)
+        }
+    }
+}
+
+public struct PlotPayload: Codable, Equatable, Sendable {
+    public var title: String?
+    public var xLabel: String?
+    public var yLabel: String?
+    public var logX: Bool
+    public var logY: Bool
+    public var series: [PlotSeries]
+
+    enum CodingKeys: String, CodingKey {
+        case title, series
+        case xLabel = "x_label"
+        case yLabel = "y_label"
+        case logX = "log_x"
+        case logY = "log_y"
+    }
+}
+
+// MARK: Timeline
+
+public struct TimelinePayload: Codable, Equatable, Sendable {
+    public struct Span: Codable, Equatable, Sendable {
+        public var lane: Int
+        public var start: Double
+        public var end: Double
+        public var label: String?
+        public var kind: String?
+    }
+
+    public var title: String?
+    public var unit: String
+    public var lanes: [String]
+    public var spans: [Span]
+    public var metrics: [String: Double]
+    public var below: [PlotSeries]
+
+    /// The time range covered by the spans and the series below.
+    public var timeRange: ClosedRange<Double> {
+        let starts = spans.map(\.start) + below.flatMap { $0.points().map(\.x) }
+        let ends = spans.map(\.end) + below.flatMap { $0.points().map(\.x) }
+        let lo = starts.min() ?? 0, hi = ends.max() ?? 1
+        return lo...max(hi, lo + 1e-9)
+    }
+
+    /// Distinct span kinds in first-seen order, for a stable color legend.
+    public var kinds: [String] {
+        var seen: [String] = []
+        for k in spans.compactMap(\.kind) where !seen.contains(k) { seen.append(k) }
+        return seen
+    }
+
+    /// Fraction of lane-time covered by spans: utilization across lanes.
+    public var utilization: Double {
+        let range = timeRange
+        let total = (range.upperBound - range.lowerBound) * Double(max(lanes.count, 1))
+        guard total > 0 else { return 0 }
+        return spans.reduce(0) { $0 + ($1.end - $1.start) } / total
+    }
 }
