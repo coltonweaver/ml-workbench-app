@@ -34,6 +34,17 @@ Keychain. The tutor uses the latest Opus model with server-side fallbacks
 turned on, so a request its safety classifiers decline is re-run on
 Anthropic's recommended fallback model instead of failing.
 
+Module 2 (language modeling basics) builds a tensor autograd engine on
+NumPy, bigram and MLP language models on 32,000 names, and comes with the
+training dashboard (loss and validation curves, gradient norms per layer,
+learning rate, tokens/sec), the embedding explorer (PCA of any embedding
+table, colored by token class) and a heatmap. The attention viewer is ready
+for module 3. Bundled data: `from workbench.data import names, shakespeare`.
+
+```python
+from workbench import show_training, show_embeddings, show_attention, show_matrix, grad_norms
+```
+
 Lessons live in [`content/`](content/README.md) as Markdown with YAML front
 matter. Each lesson goes problem, prediction, build, hidden-test check, then
 the explanation. Progress is kept in `progress.json` in your workspace, and

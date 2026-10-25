@@ -128,9 +128,12 @@ def tensor_summary(values: Any, name: str, provenance: dict[str, Any] | None = N
 def _num(x: Any) -> float | None:
     """A JSON-safe float: NaN and infinities become null."""
     try:
-        v = float(x.data if hasattr(x, "data") else x)
+        v = float(x)
     except (TypeError, ValueError):
-        return None
+        try:
+            v = float(x.data)  # a Value
+        except (AttributeError, TypeError, ValueError):
+            return None
     return v if math.isfinite(v) else None
 
 
@@ -340,3 +343,13 @@ def show_slice(
     payload = landscape_payload(f, ranges, [[0.0, 0.0]] if dims == 2 else [0.0], n,
                                 title or "loss around the current parameters", labels)
     return LandscapeHandle(payload, f)
+
+
+# Language-model instruments live in their own module; re-exported here.
+from .lm import (  # noqa: E402
+    grad_norms, pca, rerun, show_attention, show_embeddings, show_matrix, show_training,
+    token_class,
+)
+
+__all__ += ["grad_norms", "pca", "show_attention", "show_embeddings", "show_matrix",
+            "show_training", "token_class"]

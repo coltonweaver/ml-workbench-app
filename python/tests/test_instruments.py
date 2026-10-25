@@ -140,3 +140,102 @@ def test_payloads_carry_explain_with_provenance() -> None:
     surface = land["explain"][0]
     assert surface["shape"] == [5, 5] and surface["stats"]["min"] == 0.0
     assert surface["axes"] == ["x in [-1, 1]", "y in [-2, 2]"]
+
+
+# ---- language-model instruments -------------------------------------------------
+
+def test_training_dashboard_downsamples_and_flushes(monkeypatch) -> None:
+    import numpy as np
+    from workbench import lm
+
+    monkeypatch.setattr(lm, "MAX_POINTS", 10)
+    published = []
+    monkeypatch.setattr(lm.TrainingDashboard, "update", lambda self, payload=None: published.append(1))
+    dash = lm.show_training("t", every=1e9)
+    for step in range(25):
+        dash.log(step, loss=np.float64(3.0 - step * 0.1), lr=0.1, tokens=64,
+                 grad_norms={"W": 2.0}, accuracy=0.5)
+    assert len(dash.payload["points"]) <= 10 and dash.payload["stride"] > 1
+    assert dash.payload["points"][-1]["step"] == 24, "the newest point is always kept"
+    assert dash.payload["points"][-1]["metrics"] == {"accuracy": 0.5}
+    assert "tokens_per_sec" in dash.payload["points"][-1]
+    published.clear()
+    dash.done()
+    assert published and dash.payload["done"] is True
+    assert dash.payload["explain"][0]["name"] == "training loss"
+
+
+def test_grad_norms_accepts_arrays_values_and_names() -> None:
+    import numpy as np
+    from workbench import grad_norms
+
+    class P:
+        def __init__(self, g):
+            self.grad = g
+    norms = grad_norms({"a": P(np.array([3.0, 4.0])), "b": P(0.5), "none": P(None)})
+    assert norms == {"a": 5.0, "b": 0.5}
+    assert grad_norms([P(np.ones(4))]) == {"param 0": 2.0}
+
+
+def test_embedding_payload_pca() -> None:
+    import numpy as np
+    from workbench.lm import embedding_payload, token_class
+
+    rng = np.random.default_rng(0)
+    x = np.zeros((5, 3))
+    x[:, 0] = np.arange(5) * 10  # all variance along one axis
+    x[:, 1] = rng.normal(size=5) * 0.01
+    p = embedding_payload(x, list(".abcd"))
+    assert p["kind"] == "embedding" and len(p["points"]) == 5
+    assert p["explained_variance"][0] > 0.99
+    assert p["classes"][:2] == ["special", "vowel"]
+    assert token_class("Hello") == "upper" and token_class(" ") == "space" and token_class("7") == "digit"
+    with pytest.raises(ValueError):
+        embedding_payload(np.zeros((3, 2)), ["a"])
+
+
+def test_attention_payload_shapes_and_rerun() -> None:
+    import numpy as np
+    from workbench import lm
+
+    a = np.full((2, 3, 3), 1 / 3)
+    p = lm.attention_payload(a, ["a", "b", "c"])
+    assert len(p["layers"]) == 1 and len(p["layers"][0]["heads"]) == 2
+    with pytest.raises(ValueError):
+        lm.attention_payload(a, ["a", "b"])
+    calls = []
+
+    def model(text):
+        calls.append(text)
+        n = len(text)
+        return list(text), np.tril(np.ones((1, 2, n, n))) / np.arange(1, n + 1)[:, None]
+
+    h = lm.show_attention(model, "hey", title="t")
+    callback = h.payload["callback"]
+    lm.rerun(callback, "hello")
+    assert calls == ["hey", "hello"] and h.payload["tokens"] == list("hello")
+    assert h.payload["prompt"] == "hello"
+    with pytest.raises(KeyError):
+        lm.rerun("attention-999", "x")
+
+
+def test_matrix_payload() -> None:
+    import numpy as np
+    from workbench.lm import matrix_payload
+
+    p = matrix_payload(np.array([[1, 2], [3, np.inf]]), ["r0", "r1"], ["c0", "c1"], log_scale=True)
+    assert p["values"] == [[1.0, 2.0], [3.0, None]] and p["log_scale"] is True
+    with pytest.raises(ValueError):
+        matrix_payload(np.zeros((200, 2)))
+
+
+def test_as_array_handles_engine_tensors_and_values(Value) -> None:
+    import numpy as np
+    from workbench.lm import as_array
+
+    class T:
+        def __init__(self, d):
+            self.data = np.asarray(d)
+    assert as_array(T([1.0, 2.0])).tolist() == [1.0, 2.0]
+    assert as_array([Value(1.0), Value(2.0)]).tolist() == [1.0, 2.0]
+    assert as_array([[1, 2], [3, 4]]).shape == (2, 2)

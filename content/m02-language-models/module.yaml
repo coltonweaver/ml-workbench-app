@@ -1,0 +1,8 @@
+id: m02
+number: 2
+title: Language modeling basics
+summary: >
+  Characters as tokens, a bigram model from counts, then the same model
+  learned by gradient descent on a tensor engine you build, and an MLP
+  language model with embeddings. Ends with train/validation splits and
+  overfitting.

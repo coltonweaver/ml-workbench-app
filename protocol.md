@@ -45,9 +45,14 @@ unknown lesson, an invalid prediction) come back as an `error` event with
 ## Instruments
 
 The `workbench` package (in `python/workbench`) is importable in the kernel.
-`show_graph`, `show_landscape` and `show_slice` publish IPython displays with
-the MIME types `application/vnd.workbench.graph+json` and
-`application/vnd.workbench.landscape+json`. The sidecar forwards those keys
+`show_graph`, `show_landscape`, `show_slice`, `show_training`,
+`show_embeddings`, `show_attention` and `show_matrix` publish IPython displays
+with the MIME types `application/vnd.workbench.<kind>+json`, where kind is
+`graph`, `landscape`, `training`, `embedding`, `attention` or `matrix`. An
+attention viewer made from a function carries a `callback` id; to re-run it
+on a new prompt the app sends `execute` with
+`import workbench as _wb; _wb.rerun("<callback>", "<prompt>")`, and the
+viewer updates in place. The sidecar forwards those keys
 untouched; the app draws them in the Instruments tab and applies
 `update_display_data` to the widget with the same `display_id`. Non-finite
 numbers are sent as null.

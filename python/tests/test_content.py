@@ -27,13 +27,19 @@ def module_dir(lesson: Lesson) -> Path:
 
 
 def workspace_with_solutions(tmp_path: Path, lesson: Lesson) -> Path:
-    """A workspace where the learner has finished every lesson in the module."""
+    """A workspace where the learner has finished every lesson up to the end
+    of this lesson's module. Later modules import earlier ones (m03 builds on
+    m02's tensor engine), so earlier modules' solutions are there too."""
     ws = tmp_path / "ws"
-    package = ws / Path(lesson.file).parent
-    package.mkdir(parents=True)
-    (package / "__init__.py").touch()
-    for solution in (module_dir(lesson) / "solutions").glob("*.py"):
-        shutil.copy(solution, package / solution.name)
+    this = next(m for m in CATALOG.modules if m.id == lesson.module_id)
+    for module in CATALOG.modules:
+        if module.number > this.number or not module.lessons:
+            continue
+        package = ws / Path(module.lessons[0].file).parent
+        package.mkdir(parents=True, exist_ok=True)
+        (package / "__init__.py").touch()
+        for solution in (Path(module.directory) / "solutions").glob("*.py"):
+            shutil.copy(solution, package / solution.name)
     return ws
 
 

@@ -321,6 +321,12 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Re-runs an attention viewer's model on a new prompt, in the kernel.
+    func rerun(attention: AttentionPayload, prompt: String) {
+        guard let client, let code = attention.rerunCode(prompt: prompt) else { return }
+        submit { try client.execute(code) }
+    }
+
     func explain(_ summary: JSONValue) {
         askTutor("Explain this tensor: \(summary.name ?? "tensor")", tensor: summary)
     }

@@ -11,7 +11,7 @@ struct InstrumentsPane: View {
             ContentUnavailableView {
                 Label("No instruments yet", systemImage: "waveform.path.ecg")
             } description: {
-                Text("Call show_graph(value) or show_landscape(f, (lo, hi)) from your code. Import them with `from workbench import show_graph, show_landscape, show_slice`.")
+                Text("Call show_graph, show_landscape, show_training, show_embeddings, show_attention or show_matrix from your code, e.g. `from workbench import show_training`.")
             }
         } else {
             ScrollView {
@@ -34,6 +34,14 @@ struct InstrumentsPane: View {
                                 GraphInstrumentView(graph: graph)
                             case .landscape(let landscape):
                                 LandscapeInstrumentView(landscape: landscape)
+                            case .training(let training):
+                                TrainingInstrumentView(training: training)
+                            case .embedding(let embedding):
+                                EmbeddingInstrumentView(embedding: embedding)
+                            case .attention(let attention):
+                                AttentionInstrumentView(attention: attention)
+                            case .matrix(let matrix):
+                                MatrixInstrumentView(matrix: matrix)
                             }
                         }
                         .padding(10)
