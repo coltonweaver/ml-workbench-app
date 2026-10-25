@@ -1,0 +1,8 @@
+id: m06
+number: 6
+title: Post-training and scaling laws
+summary: >
+  Turn a pretrained model into one that follows a format: supervised
+  fine-tuning with a loss mask, then preference tuning with DPO against a
+  frozen reference. Then measure how loss scales with model size, fit power
+  laws to your own sweeps, and work out compute-optimal model sizes.

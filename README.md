@@ -72,6 +72,14 @@ view (component × token heatmap plus the pruned attribution graph).
 from workbench import feature_card, show_features, show_attribution
 ```
 
+Module 6 is post-training and scaling: a prompt/response format with a loss
+mask, supervised fine-tuning (a small GPT learns to reverse names it has
+never seen), the DPO loss and DPO training against a frozen reference, then
+size sweeps of your own GPTs fit to a power law with an irreducible floor,
+and Chinchilla's compute-optimal allocation and isoflop method. `show_plot`
+draws lines and points with log axes; `show_timeline` draws lanes of spans
+and is used by modules 7 and 8.
+
 Lessons live in [`content/`](content/README.md) as Markdown with YAML front
 matter. Each lesson goes problem, prediction, build, hidden-test check, then
 the explanation. Progress is kept in `progress.json` in your workspace, and
