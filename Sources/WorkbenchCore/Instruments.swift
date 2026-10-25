@@ -8,6 +8,7 @@ public enum Instrument: Equatable, Sendable {
     case embedding(EmbeddingPayload)
     case attention(AttentionPayload)
     case matrix(MatrixPayload)
+    case images(ImagesPayload)
 
     public static let graphMIME = "application/vnd.workbench.graph+json"
     public static let landscapeMIME = "application/vnd.workbench.landscape+json"
@@ -15,6 +16,7 @@ public enum Instrument: Equatable, Sendable {
     public static let embeddingMIME = "application/vnd.workbench.embedding+json"
     public static let attentionMIME = "application/vnd.workbench.attention+json"
     public static let matrixMIME = "application/vnd.workbench.matrix+json"
+    public static let imagesMIME = "application/vnd.workbench.images+json"
 
     /// Picks the instrument out of a display's MIME bundle, if it has one.
     public init?(data: [String: JSONValue]) {
@@ -30,6 +32,8 @@ public enum Instrument: Equatable, Sendable {
             self = .attention(payload)
         } else if let value = data[Self.matrixMIME], let payload = try? value.decode(MatrixPayload.self) {
             self = .matrix(payload)
+        } else if let value = data[Self.imagesMIME], let payload = try? value.decode(ImagesPayload.self) {
+            self = .images(payload)
         } else {
             return nil
         }
@@ -54,6 +58,7 @@ public enum Instrument: Equatable, Sendable {
         case .embedding(let e): e.title ?? "Embeddings"
         case .attention(let a): a.title ?? "Attention"
         case .matrix(let m): m.title ?? "Matrix"
+        case .images(let i): i.title ?? "Images"
         }
     }
 }
@@ -382,4 +387,31 @@ public func heatFraction(_ value: Double, in range: ClosedRange<Double>, log: Bo
         return Foundation.log1p(value - range.lowerBound) / Foundation.log1p(span)
     }
     return (value - range.lowerBound) / span
+}
+
+// MARK: Image grid
+
+public struct ImagesPayload: Codable, Equatable, Sendable {
+    public struct Image: Codable, Equatable, Sendable {
+        public var label: String?
+        public var width: Int
+        public var height: Int
+        /// 1 (gray) or 3 (RGB, interleaved).
+        public var channels: Int
+        /// Base64 of width × height × channels bytes, row-major.
+        public var pixels: String
+        /// The raw values' min and max before scaling to 0...255.
+        public var range: [Double]?
+
+        /// Pixel bytes, or nil if they don't match the declared size.
+        public var bytes: Data? {
+            guard let data = Data(base64Encoded: pixels), data.count == width * height * channels else {
+                return nil
+            }
+            return data
+        }
+    }
+
+    public var title: String?
+    public var images: [Image]
 }

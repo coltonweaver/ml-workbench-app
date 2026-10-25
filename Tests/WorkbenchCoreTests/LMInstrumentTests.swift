@@ -68,3 +68,19 @@ final class LMInstrumentTests: XCTestCase {
         XCTAssertGreaterThan(heatFraction(1, in: 0...9, log: true), 1.0 / 9, "log scale lifts small values")
     }
 }
+
+final class ImageInstrumentTests: XCTestCase {
+    func testImagesPayload() throws {
+        let pixels = Data([0, 128, 255, 64]).base64EncodedString()
+        let json = """
+        {"application/vnd.workbench.images+json": {"kind": "images", "title": "filters", "explain": [],
+          "images": [{"label": "c0", "width": 2, "height": 2, "channels": 1, "pixels": "\(pixels)", "range": [-1, 1]},
+                     {"label": null, "width": 3, "height": 2, "channels": 1, "pixels": "\(pixels)"}]}}
+        """
+        let data = try JSONDecoder().decode([String: JSONValue].self, from: Data(json.utf8))
+        guard case .images(let p)? = Instrument(data: data) else { return XCTFail("not decoded") }
+        XCTAssertEqual(p.images[0].bytes, Data([0, 128, 255, 64]))
+        XCTAssertNil(p.images[1].bytes, "4 bytes can't be a 3 × 2 image")
+        XCTAssertEqual(p.images[0].range, [-1, 1])
+    }
+}

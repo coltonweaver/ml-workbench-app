@@ -51,6 +51,13 @@ training a bigger one on the Apple GPU (MPS).
 from workbench import show_training, show_embeddings, show_attention, show_matrix, grad_norms
 ```
 
+Module 4 writes convolution by hand (checked against PyTorch), Sobel edges
+and pooling, trains a small CNN on a generated shapes dataset
+(`workbench.data.shapes`), then looks inside it: feature visualization by
+gradient ascent on the input, top-activating dataset examples, and reading
+and ablating a circuit between two layers. `show_images` draws image grids
+(grayscale or RGB) for all of it.
+
 Lessons live in [`content/`](content/README.md) as Markdown with YAML front
 matter. Each lesson goes problem, prediction, build, hidden-test check, then
 the explanation. Progress is kept in `progress.json` in your workspace, and

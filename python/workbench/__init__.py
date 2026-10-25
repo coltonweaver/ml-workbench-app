@@ -353,3 +353,7 @@ from .lm import (  # noqa: E402
 
 __all__ += ["grad_norms", "pca", "show_attention", "show_embeddings", "show_matrix",
             "show_training", "token_class"]
+
+from .vision import show_images  # noqa: E402
+
+__all__ += ["show_images"]

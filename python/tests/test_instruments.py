@@ -239,3 +239,33 @@ def test_as_array_handles_engine_tensors_and_values(Value) -> None:
     assert as_array(T([1.0, 2.0])).tolist() == [1.0, 2.0]
     assert as_array([Value(1.0), Value(2.0)]).tolist() == [1.0, 2.0]
     assert as_array([[1, 2], [3, 4]]).shape == (2, 2)
+
+
+def test_images_payload_layouts() -> None:
+    import base64
+    import numpy as np
+    from workbench.vision import images_payload
+
+    p = images_payload(np.arange(12, dtype=float).reshape(1, 1, 3, 4), labels=["a"])
+    img = p["images"][0]
+    assert (img["width"], img["height"], img["channels"]) == (4, 3, 1)
+    px = np.frombuffer(base64.b64decode(img["pixels"]), dtype=np.uint8)
+    assert px[0] == 0 and px[-1] == 255 and len(px) == 12
+    assert images_payload(np.zeros((5, 3, 8, 8)))["images"][0]["channels"] == 3
+    assert len(images_payload(np.zeros((8, 8)))["images"]) == 1
+    assert len(images_payload(np.zeros((4, 2, 5, 5)))["images"]) == 8, "filters show each input channel"
+    g = images_payload(np.stack([np.zeros((2, 2)), np.ones((2, 2))]), normalize="global")
+    assert base64.b64decode(g["images"][0]["pixels"]) == bytes([0] * 4)
+    with pytest.raises(ValueError):
+        images_payload(np.zeros((3, 4, 4)), labels=["x"])
+
+
+def test_shapes_dataset() -> None:
+    import numpy as np
+    from workbench.data import SHAPE_CLASSES, shapes
+
+    X, Y = shapes(120, seed=1)
+    assert X.shape == (120, 1, 32, 32) and X.dtype == np.float32 and Y.dtype == np.int64
+    assert 0 <= X.min() and X.max() <= 1 and set(Y) <= set(range(len(SHAPE_CLASSES)))
+    X2, Y2 = shapes(120, seed=1)
+    assert np.array_equal(X, X2) and np.array_equal(Y, Y2), "same seed, same data"

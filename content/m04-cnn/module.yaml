@@ -1,0 +1,7 @@
+id: m04
+number: 4
+title: CNNs and feature visualization
+summary: >
+  Convolution by hand, edge detectors, a small CNN on a shapes dataset, then
+  looking inside it: optimizing images to see what a channel detects,
+  dataset examples, and reading and testing a circuit between two layers.

@@ -42,6 +42,8 @@ struct InstrumentsPane: View {
                                 AttentionInstrumentView(attention: attention)
                             case .matrix(let matrix):
                                 MatrixInstrumentView(matrix: matrix)
+                            case .images(let images):
+                                ImagesInstrumentView(payload: images)
                             }
                         }
                         .padding(10)
