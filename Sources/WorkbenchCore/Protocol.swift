@@ -16,6 +16,8 @@ public struct SidecarRequest: Encodable, Equatable, Sendable {
         case checkLesson = "check_lesson"
         case askTutor = "ask_tutor"
         case cancelTutor = "cancel_tutor"
+        case getReview = "get_review"
+        case answerWarmup = "answer_warmup"
     }
 
     public var id: String
@@ -25,6 +27,10 @@ public struct SidecarRequest: Encodable, Equatable, Sendable {
     public var target: String?
     public var lesson: String?
     public var value: String?
+    /// submit_prediction: the learner's stated chance of being right.
+    public var confidence: Double?
+    /// answer_warmup: the warm-up's id.
+    public var warmup: String?
     // ask_tutor
     public var question: String?
     public var history: [TutorTurn]?
@@ -33,7 +39,8 @@ public struct SidecarRequest: Encodable, Equatable, Sendable {
 
     public init(
         id: String, op: Op, code: String? = nil, path: String? = nil, target: String? = nil,
-        lesson: String? = nil, value: String? = nil, question: String? = nil,
+        lesson: String? = nil, value: String? = nil, confidence: Double? = nil,
+        warmup: String? = nil, question: String? = nil,
         history: [TutorTurn]? = nil, apiKey: String? = nil, tensor: JSONValue? = nil
     ) {
         self.id = id
@@ -43,6 +50,8 @@ public struct SidecarRequest: Encodable, Equatable, Sendable {
         self.target = target
         self.lesson = lesson
         self.value = value
+        self.confidence = confidence
+        self.warmup = warmup
         self.question = question
         self.history = history
         self.apiKey = apiKey
@@ -50,7 +59,7 @@ public struct SidecarRequest: Encodable, Equatable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, op, code, path, target, lesson, value, question, history, tensor
+        case id, op, code, path, target, lesson, value, confidence, warmup, question, history, tensor
         case apiKey = "api_key"
     }
 
@@ -78,6 +87,7 @@ public struct SidecarEvent: Decodable, Equatable, Sendable {
         case lesson
         case tutorDelta = "tutor_delta"
         case tutorDone = "tutor_done"
+        case review
         case done
     }
 
@@ -115,6 +125,9 @@ public struct SidecarEvent: Decodable, Equatable, Sendable {
     public var modules: [ModuleSummary]?
     public var lesson: LessonDetail?
 
+    // review
+    public var review: ReviewState?
+
     // test_report (flattened into the event on the wire)
     public var outcome: String?
     public var passed: Int?
@@ -129,7 +142,7 @@ public struct SidecarEvent: Decodable, Equatable, Sendable {
         case python, workspace, name, text, data, ename, evalue, traceback, status
         case displayID = "display_id"
         case outcome, passed, failed, tests, output
-        case modules, lesson
+        case modules, lesson, review
         case stopReason = "stop_reason"
         case model, note
     }
@@ -278,9 +291,11 @@ public struct LessonDetail: Decodable, Equatable, Sendable, Identifiable {
     public struct Prediction: Decodable, Equatable, Sendable {
         public var value: String
         public var submittedAt: String
+        /// The stated chance of being right, when the learner gave one.
+        public var confidence: Double?
 
         enum CodingKeys: String, CodingKey {
-            case value
+            case value, confidence
             case submittedAt = "submitted_at"
         }
     }

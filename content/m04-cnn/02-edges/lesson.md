@@ -27,6 +27,12 @@ mutants:
   - name: magnitude without padding
     file: m04/conv.py
     replace: ["g = conv2d(x, w, padding=1)[0]", "g = conv2d(x, w)[0]"]
+warmups:
+  - kind: number
+    prompt: "Two 3×3 convolutions with stride 1, one after the other. How wide is the receptive field of one output pixel?"
+    answer: 5
+    tolerance: 0.01
+    explain: "Each 3×3 layer adds 2: 1 + 2 + 2 = 5. Stacking small kernels grows the receptive field with fewer weights than one big kernel."
 ---
 
 ## Hook

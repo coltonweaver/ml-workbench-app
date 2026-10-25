@@ -22,6 +22,12 @@ mutants:
   - name: naive cost ignores the bottleneck
     file: m08/collectives.py
     replace: ["return (world - 1) * n_bytes", "return n_bytes"]
+warmups:
+  - kind: number
+    prompt: "Ring all-reduce of 1 GB across 4 ranks. How many GB does each rank send?"
+    answer: 1.5
+    tolerance: 0.02
+    explain: "2(N − 1)/N × size = 1.5 GB: reduce-scatter then all-gather, each moving (N − 1)/N of the data. It hardly grows with N."
 ---
 
 ## Hook

@@ -26,6 +26,12 @@ mutants:
   - name: forgets the padding
     file: m04/conv.py
     replace: ["    if padding:\n", "    if False:\n"]
+warmups:
+  - kind: number
+    prompt: "A 28×28 image, a 5×5 kernel, stride 1, no padding. What is the output's width?"
+    answer: 24
+    tolerance: 0.01
+    explain: "28 − 5 + 1 = 24. In general (W − K + 2P) / S + 1."
 ---
 
 ## Hook

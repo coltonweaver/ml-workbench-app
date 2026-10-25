@@ -24,6 +24,12 @@ mutants:
   - name: no residual around the MLP
     file: m03/gpt.py
     replace: ["        return x + self.mlp(self.ln2(x))", "        return self.mlp(self.ln2(x))"]
+warmups:
+  - kind: choice
+    prompt: "In a pre-norm transformer block, what gets added to the residual stream x by the attention sublayer?"
+    options: ["ln(x + attn(x))", "attn(ln(x))", "ln(attn(x))"]
+    answer: 1
+    explain: "x ← x + attn(ln(x)). The stream itself is never normalized, so there's a clean additive path from embedding to output."
 ---
 
 ## Hook

@@ -16,6 +16,12 @@ mutants:
   - name: divides by h instead of 2h
     file: m01/slope.py
     replace: ["(2 * h)", "h"]
+warmups:
+  - kind: number
+    prompt: "f(x) = x². With h = 0.1, what does the central difference (f(3 + h) − f(3 − h)) / 2h give at x = 3?"
+    answer: 6
+    tolerance: 0.02
+    explain: "(9.61 − 8.41) / 0.2 = 6, exactly f′(3) = 2·3. For a quadratic the central difference has no error at all: the h² terms cancel."
 ---
 
 ## Hook

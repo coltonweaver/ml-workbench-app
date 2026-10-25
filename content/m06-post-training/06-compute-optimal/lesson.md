@@ -26,6 +26,12 @@ mutants:
   - name: parabola minimum sign
     file: m06/scaling.py
     replace: ["return float(np.exp(-b / (2 * a)))", "return float(np.exp(b / (2 * a)))"]
+warmups:
+  - kind: number
+    prompt: "Training compute is about 6·N·D FLOPs. A 1B-parameter model trained on 20B tokens: how many FLOPs, in units of 1e20?"
+    answer: 1.2
+    tolerance: 0.02
+    explain: "6 × 1e9 × 2e10 = 1.2e20. 20 tokens per parameter is roughly Chinchilla's compute-optimal ratio."
 ---
 
 ## Hook

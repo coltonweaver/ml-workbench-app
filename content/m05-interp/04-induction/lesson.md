@@ -24,6 +24,12 @@ mutants:
   - name: trains on a fixed length
     file: m05/induction.py
     replace: ["half = int(rng.integers(4, max_half + 1))", "half = max_half"]
+warmups:
+  - kind: choice
+    prompt: "An induction head sees “… A B … A”. What does it push the model to predict next?"
+    options: ["A", "B", "The token before the first A"]
+    answer: 1
+    explain: "It finds the earlier A, looks at what followed it, and copies B. That's the mechanism behind a lot of in-context learning."
 ---
 
 ## Hook

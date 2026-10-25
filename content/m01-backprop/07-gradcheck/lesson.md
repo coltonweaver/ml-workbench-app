@@ -19,6 +19,12 @@ mutants:
   - name: forgets the 2 in the central difference
     file: m01/gradcheck.py
     replace: ["/ (2 * h)", "/ h"]
+warmups:
+  - kind: choice
+    prompt: "In float64 with h = 1e-6, your analytic gradient and the finite difference have a relative error of 1e-2. What does that say?"
+    options: ["That's normal floating-point noise", "There's probably a bug in a backward rule", "h is too small"]
+    answer: 1
+    explain: "With float64 and a central difference, a correct gradient agrees to about 1e-7 or better. 1e-2 means a backward rule is wrong somewhere."
 ---
 
 ## Hook

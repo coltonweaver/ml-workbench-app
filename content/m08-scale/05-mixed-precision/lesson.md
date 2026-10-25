@@ -26,6 +26,12 @@ mutants:
   - name: forgets to unscale
     file: m08/precision.py
     replace: ["return (true_grad * scale).half().float() / scale", "return (true_grad * scale).half().float()"]
+warmups:
+  - kind: choice
+    prompt: "A gradient of 1e-9 is cast to fp16 (smallest positive value about 6e-8). What happens to it?"
+    options: ["It rounds to zero", "It's stored exactly", "It overflows to infinity"]
+    answer: 0
+    explain: "It underflows. Loss scaling multiplies the loss (and so every gradient) by a big factor before backward and divides it out in fp32."
 ---
 
 ## Hook

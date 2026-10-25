@@ -27,6 +27,12 @@ mutants:
   - name: cross-entropy gradient ignores the upstream gradient
     file: m02/losses.py
     replace: ["logits.grad += g / n * out.grad", "logits.grad += g / n"]
+warmups:
+  - kind: number
+    prompt: "Logits for two classes are 1000 and 1000. The right class is the first. What is the cross-entropy loss? (to 3 decimals)"
+    answer: 0.693
+    tolerance: 0.02
+    explain: "Softmax only sees differences, so this is softmax([0, 0]) = [0.5, 0.5], and the loss is −ln 0.5 = ln 2. Computing exp(1000) directly overflows; subtract the max first."
 ---
 
 ## Hook

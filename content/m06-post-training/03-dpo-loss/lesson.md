@@ -23,6 +23,12 @@ mutants:
   - name: counts the prompt
     file: m06/dpo.py
     replace: ["return (logp * mask).sum(-1)", "return logp.sum(-1)"]
+warmups:
+  - kind: number
+    prompt: "At the start of DPO the policy equals the reference. What is the DPO loss? (to 3 decimals)"
+    answer: 0.693
+    tolerance: 0.02
+    explain: "Both log-ratios are 0, so the loss is −log σ(0) = ln 2, whatever β is."
 ---
 
 ## Hook

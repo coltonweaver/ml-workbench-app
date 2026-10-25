@@ -24,6 +24,12 @@ mutants:
   - name: stragglers by the mean
     file: m08/fault.py
     replace: ["per_rank = np.median(t, axis=1)", "per_rank = np.mean(t, axis=1)"]
+warmups:
+  - kind: number
+    prompt: "Synchronous training on 64 workers. One worker suddenly runs at half speed. What fraction of the healthy throughput is left?"
+    answer: 0.5
+    tolerance: 0.02
+    explain: "Every step waits for the slowest worker, so the whole job runs at its speed. Backup workers or dropping the slowest gradient fix this."
 ---
 
 ## Hook

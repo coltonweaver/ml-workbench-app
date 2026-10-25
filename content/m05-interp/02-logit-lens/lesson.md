@@ -27,6 +27,12 @@ mutants:
   - name: leaves out the MLPs
     file: m05/lens.py
     replace: ["        out.append((f\"mlp {i}\", cache[f\"blocks.{i}.mlp_out\"]))\n", ""]
+warmups:
+  - kind: choice
+    prompt: "What does the logit lens do?"
+    options: ["Applies the final layer norm and unembedding to an intermediate residual stream", "Trains a linear probe on each layer", "Removes layers one at a time"]
+    answer: 0
+    explain: "It reads off what the model would predict if it stopped at that layer. No training, which is its appeal and its weakness."
 ---
 
 ## Hook

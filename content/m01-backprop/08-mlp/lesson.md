@@ -17,6 +17,12 @@ mutants:
   - name: never resets gradients between steps
     file: m01/nn.py
     replace: ["p.grad = 0.0", "pass"]
+warmups:
+  - kind: choice
+    prompt: "An MLP's loss stays flat from the first step. Which bug fits?"
+    options: ["The learning rate is a bit too high", "The data is shuffled each epoch", "The update step never changes the parameters"]
+    answer: 2
+    explain: "A flat loss from step one means nothing moves: the update isn't applied (or applies to copies). Stale accumulated gradients make the loss jump around instead."
 ---
 
 ## Hook

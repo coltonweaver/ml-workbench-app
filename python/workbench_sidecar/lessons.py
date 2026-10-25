@@ -67,6 +67,31 @@ class Prediction:
 
 
 @dataclass
+class Warmup:
+    problem: Prediction
+    explain: str | None = None
+
+
+def _prediction(p: dict[str, Any], path: str, where: str,
+                kinds: tuple[str, ...] = PREDICTION_KINDS) -> Prediction:
+    if p.get("kind") not in kinds:
+        raise ContentError(f"{path}: {where}.kind must be one of {kinds}")
+    if "prompt" not in p:
+        raise ContentError(f"{path}: {where} needs a prompt")
+    if p["kind"] == "choice" and not p.get("options"):
+        raise ContentError(f"{path}: choice predictions need options")
+    if p["kind"] != "text" and "answer" not in p:
+        raise ContentError(f"{path}: {p['kind']} predictions need an answer")
+    return Prediction(
+        kind=p["kind"],
+        prompt=p["prompt"],
+        options=p.get("options"),
+        answer=p.get("answer"),
+        tolerance=float(p.get("tolerance", 0.05)),
+    )
+
+
+@dataclass
 class Lesson:
     id: str
     title: str
@@ -81,6 +106,8 @@ class Lesson:
     predict: Prediction
     sections: dict[str, str]
     mutants: list[dict[str, Any]] = field(default_factory=list)
+    # Short review problems for the warm-up queue (see review.py).
+    warmups: list[Warmup] = field(default_factory=list)
 
     @property
     def tests_path(self) -> str:
@@ -132,13 +159,11 @@ def load_lesson(path: str, module: dict[str, Any], module_dir: str) -> Lesson:
     for key in ("id", "title", "file", "tests", "predict"):
         if key not in meta:
             raise ContentError(f"{path}: front matter needs {key!r}")
-    p = meta["predict"]
-    if p.get("kind") not in PREDICTION_KINDS:
-        raise ContentError(f"{path}: predict.kind must be one of {PREDICTION_KINDS}")
-    if p["kind"] == "choice" and not p.get("options"):
-        raise ContentError(f"{path}: choice predictions need options")
-    if p["kind"] != "text" and "answer" not in p:
-        raise ContentError(f"{path}: {p['kind']} predictions need an answer")
+    predict = _prediction(meta["predict"], path, "predict")
+    warmups = [
+        Warmup(_prediction(w, path, f"warmups[{i}]", ("choice", "number")), w.get("explain"))
+        for i, w in enumerate(meta.get("warmups", []))
+    ]
     lesson_dir = os.path.dirname(path)
     file_base = os.path.basename(meta["file"])
     stub = meta.get("stub")
@@ -154,15 +179,10 @@ def load_lesson(path: str, module: dict[str, Any], module_dir: str) -> Lesson:
         solution=solution if os.path.exists(solution) else None,
         tests=meta["tests"],
         concepts=list(meta.get("concepts", [])),
-        predict=Prediction(
-            kind=p["kind"],
-            prompt=p["prompt"],
-            options=p.get("options"),
-            answer=p.get("answer"),
-            tolerance=float(p.get("tolerance", 0.05)),
-        ),
+        predict=predict,
         sections=_split_sections(body, path),
         mutants=list(meta.get("mutants", [])),
+        warmups=warmups,
     )
     if not os.path.exists(lesson.tests_path):
         raise ContentError(f"{path}: tests file {lesson.tests} not found")
@@ -325,7 +345,10 @@ class LessonService:
             },
         }
 
-    def predict(self, lesson_id: str, value: str) -> dict[str, Any]:
+    def predict(self, lesson_id: str, value: str,
+                confidence: float | None = None) -> dict[str, Any]:
+        """Record a prediction. ``confidence`` is the learner's stated chance
+        of being right, for the calibration score."""
         lesson = self.catalog.lesson(lesson_id)
         value = str(value).strip()
         if not value:
@@ -338,11 +361,20 @@ class LessonService:
         if lesson.predict.kind == "choice":
             if not value.isdigit() or int(value) >= len(lesson.predict.options or []):
                 raise ContentError(f"{value!r} isn't one of the options")
+        if confidence is not None:
+            try:
+                confidence = float(confidence)
+            except (TypeError, ValueError):
+                raise ContentError(f"confidence {confidence!r} isn't a number") from None
+            if not 0 < confidence <= 1:
+                raise ContentError("confidence must be in (0, 1]")
         progress = self._progress()
         entry = progress.lesson(lesson_id)
         if entry.get("prediction") is not None:
             raise ContentError("a prediction is already recorded for this lesson")
         entry["prediction"] = {"value": value, "submitted_at": _now()}
+        if confidence is not None and lesson.predict.kind != "text":
+            entry["prediction"]["confidence"] = confidence
         progress.save()
         return self.detail(lesson_id)
 
@@ -369,6 +401,8 @@ class LessonService:
                         "concepts": lesson.concepts,
                         "test": test["nodeid"].split("::")[-1],
                         "message": test.get("message"),
+                        # Which check run: one run can fail several tests.
+                        "attempt": entry["attempts"],
                         "at": _now(),
                     })
         progress.save()

@@ -27,6 +27,12 @@ mutants:
   - name: interference counts itself
     file: m05/toy.py
     replace: ["    overlap.fill_diagonal_(0)\n", ""]
+warmups:
+  - kind: choice
+    prompt: "In the toy model, superposition shows up when the features are…"
+    options: ["Dense: most are active on every input", "Sparse: each is rarely active", "Exactly as many as the dimensions"]
+    answer: 1
+    explain: "Sparse features rarely collide, so the model can pack more of them than it has dimensions and pay little interference."
 ---
 
 ## Hook

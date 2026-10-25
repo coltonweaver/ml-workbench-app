@@ -26,6 +26,12 @@ mutants:
   - name: counts the embeddings
     file: m06/scaling.py
     replace: ["    if not embeddings:\n        n -=", "    if False:\n        n -="]
+warmups:
+  - kind: number
+    prompt: "Loss follows L(N) = 10 · N^−0.5. What is the loss at N = 400?"
+    answer: 0.5
+    tolerance: 0.02
+    explain: "10 / √400 = 0.5. Every 4× in N halves this loss: a power law is a straight line on log-log axes."
 ---
 
 ## Hook

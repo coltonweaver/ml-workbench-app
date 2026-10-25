@@ -27,6 +27,12 @@ mutants:
   - name: quantizes the original
     file: m07/quant.py
     replace: ["    model = copy.deepcopy(model)\n", ""]
+warmups:
+  - kind: number
+    prompt: "Symmetric int8 quantization of a row whose largest |value| is 2.54. What is the scale?"
+    answer: 0.02
+    tolerance: 0.02
+    explain: "scale = max|w| / 127 = 0.02, and each weight is stored as round(w / 0.02). One outlier in the row makes that scale coarse for everyone."
 ---
 
 ## Hook

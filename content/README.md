@@ -45,6 +45,12 @@ mutants:                     # planted bugs the hidden tests must catch
   - name: divides by h instead of 2h
     file: m01/slope.py
     replace: ["(2 * h)", "h"]    # applied to the solution
+warmups:                     # optional review problems, number or choice
+  - kind: number
+    prompt: ...
+    answer: 6
+    tolerance: 0.02
+    explain: ...             # shown after answering
 ---
 
 ## Hook
@@ -58,7 +64,17 @@ The theory, the proper name and the original paper. Shown only after passing.
 
 ## Stretch
 Optional harder variant. Shown only after passing.
+
 ```
+
+## Review queue
+
+A concept with failed checks in two or more separate runs comes back as a
+warm-up at the start of a later session (at most three at a time). The
+problem is one of the `warmups` of a lesson that teaches the concept and
+that the learner has opened, or failing that the lesson's own prediction,
+rotating after a wrong answer. A right answer clears the concept until two
+new failed runs. See `python/workbench_sidecar/review.py`.
 
 ## Hidden tests
 

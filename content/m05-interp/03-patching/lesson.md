@@ -28,6 +28,12 @@ mutants:
   - name: logit difference backwards
     file: m05/patching.py
     replace: ["return (last[:, good] - last[:, bad]).mean()", "return (last[:, bad] - last[:, good]).mean()"]
+warmups:
+  - kind: choice
+    prompt: "Patching one head's clean activation into the corrupted run restores 90% of the clean logit difference. What does that suggest?"
+    options: ["That head carries most of the information the task needs", "That head is irrelevant", "Every other head is irrelevant"]
+    answer: 0
+    explain: "Patching shows sufficiency of that activation for restoring behaviour in this setup. It doesn't show other heads are unused; that takes ablations."
 ---
 
 ## Hook

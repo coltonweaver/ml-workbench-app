@@ -18,6 +18,12 @@ mutants:
   - name: walks the graph leaves-first
     file: m01/engine.py
     replace: ["for v in reversed(order):", "for v in order:"]
+warmups:
+  - kind: number
+    prompt: "f = a·b + a with a = 2, b = 3. What is ∂f/∂a?"
+    answer: 4
+    tolerance: 0.01
+    explain: "a reaches f by two paths: through a·b (contributes b = 3) and directly (contributes 1). Gradients from every path add, which is why backward uses +=."
 ---
 
 ## Hook

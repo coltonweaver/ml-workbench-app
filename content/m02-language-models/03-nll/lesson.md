@@ -21,6 +21,12 @@ mutants:
   - name: forgets the minus sign
     file: m02/nll.py
     replace: ["total -= np.log", "total += np.log"]
+warmups:
+  - kind: number
+    prompt: "A model gives probability 0.25 to the right next token, every time, over 100 tokens. What is its perplexity?"
+    answer: 4
+    tolerance: 0.02
+    explain: "Perplexity = exp(mean NLL) = exp(ln 4) = 4: as unsure as picking uniformly among 4 tokens."
 ---
 
 ## Hook

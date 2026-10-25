@@ -198,9 +198,10 @@ def test_lesson_flow_over_the_protocol(sidecar: Sidecar, workspace: Path) -> Non
 
     events = sidecar.request(op="submit_prediction", lesson="1.1", value="nope")
     assert any(e["type"] == "error" and e["ename"] == "LessonError" for e in events)
-    events = sidecar.request(op="submit_prediction", lesson="1.1", value="3")
+    events = sidecar.request(op="submit_prediction", lesson="1.1", value="3", confidence=0.9)
     lesson = next(e for e in events if e["type"] == "lesson")["lesson"]
     assert lesson["progress"]["prediction"]["value"] == "3"
+    assert lesson["progress"]["prediction"]["confidence"] == 0.9
 
     events = sidecar.request(op="check_lesson", lesson="1.1")
     report = next(e for e in events if e["type"] == "test_report")
@@ -211,11 +212,39 @@ def test_lesson_flow_over_the_protocol(sidecar: Sidecar, workspace: Path) -> Non
     (workspace / "m01" / "slope.py").write_text(solution)
     events = sidecar.request(op="check_lesson", lesson="1.1")
     kinds = [e["type"] for e in events]
-    assert kinds[-4:] == ["test_report", "lesson", "lessons", "done"], kinds
+    assert kinds[-5:] == ["test_report", "lesson", "lessons", "review", "done"], kinds
     lesson = next(e for e in events if e["type"] == "lesson")["lesson"]
     assert lesson["progress"]["status"] == "passed"
     assert lesson["explain"] and lesson["progress"]["feedback"]["correct"] is True
     assert events[-1]["status"] == "ok"
+    score = next(e for e in events if e["type"] == "review")["review"]["score"]
+    assert score["count"] == 1 and score["hit_rate"] == 1.0
+    assert score["brier"] == pytest.approx(0.01)
+
+
+def test_review_over_the_protocol(sidecar: Sidecar, workspace: Path) -> None:
+    sidecar.request(op="open_lesson", lesson="1.1")
+    progress = json.loads((workspace / "progress.json").read_text())
+    concepts = ["derivative", "finite-differences"]
+    progress["mistakes"] = [
+        {"lesson": "1.1", "concepts": concepts, "test": "test_slope", "message": "off by 2x",
+         "attempt": n, "at": "2026-01-01T09:00:00+0000"} for n in (1, 2)
+    ]
+    (workspace / "progress.json").write_text(json.dumps(progress))
+
+    events = sidecar.request(op="get_review")
+    review = next(e for e in events if e["type"] == "review")["review"]
+    assert {w["concept"] for w in review["warmups"]} == set(concepts)
+    assert review["result"] is None and review["score"]["count"] == 0
+    warmup = next(w for w in review["warmups"] if w["concept"] == "derivative")
+
+    events = sidecar.request(op="answer_warmup", warmup=warmup["id"], value="-1")
+    review = next(e for e in events if e["type"] == "review")["review"]
+    assert review["result"]["correct"] is False and review["result"]["answer"]
+    assert "derivative" in {w["concept"] for w in review["warmups"]}
+
+    events = sidecar.request(op="answer_warmup", warmup="nope|1.1|p", value="1")
+    assert any(e["type"] == "error" and e["ename"] == "LessonError" for e in events)
 
 
 def test_unknown_lesson_is_a_lesson_error(sidecar: Sidecar) -> None:

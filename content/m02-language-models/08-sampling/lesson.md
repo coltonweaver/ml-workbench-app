@@ -23,6 +23,12 @@ mutants:
   - name: generate doesn't feed tokens back
     file: m02/sampling.py
     replace: ["        context.append(i)\n", ""]
+warmups:
+  - kind: choice
+    prompt: "As the sampling temperature goes to 0, sampling becomes…"
+    options: ["Uniform over the vocabulary", "Greedy: always the most likely token", "Unchanged"]
+    answer: 1
+    explain: "Dividing logits by a tiny T blows up the gap between the top logit and the rest, so softmax puts all its mass on the argmax."
 ---
 
 ## Hook

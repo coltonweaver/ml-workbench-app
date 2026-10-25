@@ -20,6 +20,12 @@ mutants:
   - name: steps uphill
     file: m01/descent.py
     replace: ["x - lr", "x + lr"]
+warmups:
+  - kind: choice
+    prompt: "Gradient descent on a bowl-shaped loss: each step lands on the other side of the minimum, a little further up than the last. What's wrong?"
+    options: ["The learning rate is too low", "The learning rate is too high", "The gradient has the wrong sign"]
+    answer: 1
+    explain: "Each step overshoots by more than it corrects. Past 2/curvature the steps grow instead of shrink; halve the learning rate."
 ---
 
 ## Hook

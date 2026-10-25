@@ -79,8 +79,16 @@ private struct PredictionCard: View {
             if let prediction = lesson.progress.prediction {
                 Label("You predicted: \(display(prediction.value))", systemImage: "lock.fill")
                     .foregroundStyle(.secondary)
+                if let confidence = prediction.confidence {
+                    Text("\(Int((confidence * 100).rounded()))% sure")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             } else {
                 input
+                if lesson.predict.kind != "text" {
+                    ConfidencePicker(confidence: $model.predictionConfidence)
+                }
                 HStack {
                     Button("Lock in prediction") { model.submitPrediction() }
                         .keyboardShortcut(.return, modifiers: [.command])
@@ -185,5 +193,31 @@ private struct FeedbackCard: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+
+/// How sure the learner is, for the prediction score on the home screen.
+/// Optional: leaving it unset still records the prediction.
+struct ConfidencePicker: View {
+    @Binding var confidence: Double?
+
+    static let levels: [(Double, String)] = [(0.5, "Guessing"), (0.7, "Fairly sure"), (0.9, "Sure")]
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text("How sure?")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Picker("How sure?", selection: $confidence) {
+                Text("Skip").tag(Double?.none)
+                ForEach(Self.levels, id: \.0) { level, label in
+                    Text("\(label) (\(Int(level * 100))%)").tag(Double?.some(level))
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+        }
     }
 }

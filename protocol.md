@@ -28,10 +28,12 @@ echoes it.
 | `shutdown`  |          | Stops the kernel and exits. |
 | `list_lessons` |       | Re-reads the content folder; answers with `lessons`. |
 | `open_lesson` | `lesson` | Copies the lesson's stub into the workspace if its file doesn't exist, marks it in progress; answers with `lesson`. |
-| `submit_prediction` | `lesson`, `value` | Records the prediction (once per lesson). `value` is a string: the number, the option index, or free text. Answers with `lesson`. |
+| `submit_prediction` | `lesson`, `value`, `confidence` | Records the prediction (once per lesson). `value` is a string: the number, the option index, or free text. `confidence` (optional, in (0, 1]) is the learner's stated chance of being right, used for the prediction score. Answers with `lesson`. |
+| `get_review` | | Answers with `review`. |
+| `answer_warmup` | `warmup`, `value` | Grades a warm-up from the review queue and records it in `progress.json`. Answers with `review`, whose `result` is set. |
 | `ask_tutor` | `question`, `history`, `api_key`, `lesson`, `code`, `tensor` | Asks the tutor. `history` is the chat so far as `[{role, text}]`; `code` is the editor's text for the open lesson's file (read from disk when absent); `tensor` is a summary from an instrument's `explain` list. `api_key` may be null, then `ANTHROPIC_API_KEY` is used. Answers with `tutor_delta` events and `tutor_done`. |
 | `cancel_tutor` | | Stops the answer that's streaming. Handled immediately. |
-| `check_lesson` | `lesson` | Runs the lesson's hidden tests against the workspace, updates `progress.json`, commits the workspace on a first pass. Answers with `test_report`, `lesson`, `lessons`. |
+| `check_lesson` | `lesson` | Runs the lesson's hidden tests against the workspace, updates `progress.json`, commits the workspace on a first pass. Answers with `test_report`, `lesson`, `lessons`, `review`. |
 
 Everything except `interrupt`, `shutdown`, `ask_tutor` and `cancel_tutor` is
 queued and handled one at a time. Tutor questions have their own queue, so
@@ -76,6 +78,7 @@ sends one of them as `ask_tutor`'s `tensor`.
 | `test_report`    | `outcome` (`passed`, `failed`, `no_tests`, `timeout`, `cancelled`, `error`), `exit_code`, `passed`, `failed`, `tests` (list of `{nodeid, outcome, duration, message}`), `output` (pytest's console text) |
 | `lessons`        | `modules`: list of `{id, number, title, summary, lessons: [{id, title, status}]}`; status is `new`, `in_progress` or `passed` |
 | `lesson`         | `lesson`: `{id, title, module_id, module_title, file, concepts, hook, build, explain, stretch, predict: {kind, prompt, options}, progress: {status, attempts, prediction, feedback}}`. `explain`, `stretch` and `feedback` are null until the lesson is passed. |
+| `review`         | `review`: `{warmups, score, result}`. `warmups`: up to 3 of `{id, concept, lesson, lesson_title, context, kind, prompt, options, mistakes, last_message}` for concepts with failed checks in two or more runs before this session. `score`: `{count, correct, hit_rate, rated, brier, overconfidence, buckets: [{confidence, count, hit_rate}], history: [{lesson, correct, confidence, hit_rate}]}` over passed lessons' graded predictions. `result`: after `answer_warmup`, `{id, concept, correct, yours, answer, explain, lesson, lesson_title}`, else null. |
 | `tutor_delta`    | `text`: the next piece of the tutor's answer |
 | `tutor_done`     | `stop_reason` (`end_turn`, `max_tokens`, `refusal`, `cancelled`), `model`, `note` (why it stopped, for refusals) |
 | `done`           | `status` (`ok`, `error`, `aborted`). Always the last event for a request. |

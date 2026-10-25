@@ -27,6 +27,12 @@ mutants:
   - name: averages over all positions
     file: m06/sft.py
     replace: ["return (nll * mask).sum() / mask.sum().clamp_min(1)", "return (nll * mask).mean()"]
+warmups:
+  - kind: choice
+    prompt: "With loss masking in supervised fine-tuning, which tokens contribute to the loss?"
+    options: ["The prompt only", "The response only", "Both"]
+    answer: 1
+    explain: "The model should learn to answer, not to predict the user's question. The mask zeros the loss on the prompt and padding."
 ---
 
 ## Hook

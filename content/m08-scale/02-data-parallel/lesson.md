@@ -27,6 +27,12 @@ mutants:
   - name: no communication
     file: m08/data_parallel.py
     replace: ["        ring_all_reduce(p.grad)\n", ""]
+warmups:
+  - kind: choice
+    prompt: "Data parallelism where each rank averages its gradient with the others: it matches a single process trained on…"
+    options: ["Each rank's own shard", "The whole global batch (all the shards together)", "The global batch with a smaller learning rate"]
+    answer: 1
+    explain: "The mean of the per-shard mean gradients is the gradient of the mean loss over the global batch (with equal shard sizes)."
 ---
 
 ## Hook

@@ -18,6 +18,8 @@ struct OutputChunk: Identifiable, Equatable {
 }
 
 enum SidebarItem: Hashable {
+    /// The review queue and prediction score.
+    case home
     case lesson(String)
     case file(String)
 }
@@ -64,6 +66,16 @@ final class AppModel: ObservableObject {
     /// What the learner has typed or picked for the open lesson's prediction.
     /// For a choice prediction this is the option's index.
     @Published var predictionDraft = ""
+    /// How sure the learner is of that prediction, if they said.
+    @Published var predictionConfidence: Double?
+
+    // Review queue and prediction score
+    @Published private(set) var review: ReviewState?
+    /// Typed or picked answers, by warm-up id.
+    @Published var warmupDrafts: [String: String] = [:]
+    /// The warm-ups answered this session, newest first, so the home screen
+    /// can keep showing the result after the queue moves on.
+    @Published private(set) var warmupResults: [WarmupResult] = []
     @Published var selection: SidebarItem? {
         didSet { if selection != oldValue { selectionChanged() } }
     }
@@ -96,7 +108,7 @@ final class AppModel: ObservableObject {
         do {
             try workspace.prepare()
             refreshFiles()
-            if selection == nil, let first = files.first { selection = .file(first) }
+            if selection == nil { selection = .home }
         } catch {
             errorMessage = "Couldn't prepare workspace at \(workspace.root.path): \(error.localizedDescription)"
         }
@@ -158,11 +170,15 @@ final class AppModel: ObservableObject {
     private func selectionChanged() {
         save()
         switch selection {
+        case .home:
+            lesson = nil
+            if let client { submit { try client.getReview() } }
         case .file(let path):
             lesson = nil
             selectedFile = path
         case .lesson(let id):
             predictionDraft = ""
+            predictionConfidence = nil
             guard let client else { return }
             // The sidecar answers with a `lesson` event; handle() opens its file.
             do {
@@ -235,7 +251,14 @@ final class AppModel: ObservableObject {
         guard let lesson, let client else { return }
         let value = predictionDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return }
-        submit { try client.submitPrediction(lesson: lesson.id, value: value) }
+        submit { try client.submitPrediction(lesson: lesson.id, value: value, confidence: predictionConfidence) }
+    }
+
+    func answer(_ warmup: Warmup) {
+        guard let client else { return }
+        let value = (warmupDrafts[warmup.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+        submit { try client.answerWarmup(warmup.id, value: value) }
     }
 
     func check() {
@@ -387,10 +410,19 @@ final class AppModel: ObservableObject {
             append(.info, "Python \(event.python ?? "?") ready in \(event.workspace ?? workspace.root.path)\n")
             if let client {
                 submit { try client.listLessons() }
+                submit { try client.getReview() }
                 if case .lesson(let id)? = selection { submit { try client.openLesson(id) } }
             }
         case .lessons:
             modules = event.modules ?? []
+        case .review:
+            guard let state = event.review else { break }
+            review = state
+            if let result = state.result {
+                warmupResults.removeAll { $0.id == result.id }
+                warmupResults.insert(result, at: 0)
+                warmupDrafts[result.id] = nil
+            }
         case .lesson:
             guard let detail = event.lesson, selection == .lesson(detail.id) else { break }
             lesson = detail

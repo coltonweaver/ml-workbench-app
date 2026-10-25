@@ -23,6 +23,12 @@ mutants:
   - name: forgets the values
     file: m07/kv_cache.py
     replace: ["return 2 * n_layer * n_embd * tokens * batch * bytes_per_value", "return n_layer * n_embd * tokens * batch * bytes_per_value"]
+warmups:
+  - kind: number
+    prompt: "32 layers, n_embd 4096, K and V stored in 2-byte floats. How many MiB of KV cache per token?"
+    answer: 0.5
+    tolerance: 0.02
+    explain: "2 (K and V) × 32 × 4096 × 2 bytes = 524,288 bytes = 0.5 MiB per token, so a 4,000-token context is 2 GiB."
 ---
 
 ## Hook

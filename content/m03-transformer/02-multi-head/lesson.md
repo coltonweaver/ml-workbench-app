@@ -25,6 +25,12 @@ mutants:
   - name: forgets the output projection
     file: m03/attention.py
     replace: ["return self.merge_heads(out) @ self.Wo", "return self.merge_heads(out)"]
+warmups:
+  - kind: number
+    prompt: "n_embd = 128 split across 4 heads. What is each head's size?"
+    answer: 32
+    tolerance: 0.01
+    explain: "128 / 4. The heads share the width rather than each getting the full 128, so multi-head attention costs about the same as one big head."
 ---
 
 ## Hook

@@ -28,6 +28,12 @@ mutants:
   - name: release forgets the blocks
     file: m07/paged.py
     replace: ["self.free.extend(self.tables.pop(seq))", "self.tables.pop(seq)"]
+warmups:
+  - kind: number
+    prompt: "KV blocks hold 16 tokens. A sequence has 50 tokens. How many token slots are allocated but empty?"
+    answer: 14
+    tolerance: 0.01
+    explain: "50 tokens need 4 blocks = 64 slots, so 14 are unused. Paging bounds the waste to under one block per sequence."
 ---
 
 ## Hook

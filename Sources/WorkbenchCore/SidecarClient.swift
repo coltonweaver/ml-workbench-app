@@ -197,9 +197,24 @@ public final class SidecarClient: @unchecked Sendable {
     }
 
     @discardableResult
-    public func submitPrediction(lesson id: String, value: String) throws -> String {
+    public func submitPrediction(lesson id: String, value: String, confidence: Double? = nil) throws -> String {
         try send(.submitPrediction) {
             $0.lesson = id
+            $0.value = value
+            $0.confidence = confidence
+        }
+    }
+
+    /// The review queue and prediction score; answers with a `review` event.
+    @discardableResult
+    public func getReview() throws -> String {
+        try send(.getReview)
+    }
+
+    @discardableResult
+    public func answerWarmup(_ id: String, value: String) throws -> String {
+        try send(.answerWarmup) {
+            $0.warmup = id
             $0.value = value
         }
     }

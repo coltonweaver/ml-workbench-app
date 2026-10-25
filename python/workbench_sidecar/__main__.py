@@ -20,6 +20,7 @@ from typing import Any, TextIO
 from . import PROTOCOL_VERSION
 from .kernel import KernelSession
 from .lessons import Catalog, ContentError, LessonService
+from .review import ReviewService
 from .testing import TestRun
 from .tutor import Tutor, TutorError, TutorRequest, build_context
 
@@ -30,6 +31,8 @@ class Server:
         self.workspace = os.path.abspath(workspace)
         self.kernel = KernelSession(self.workspace)
         self.lessons = LessonService(Catalog(content), self.workspace) if content else None
+        # The session starts now: mistakes from here on are reviewed next time.
+        self.review = ReviewService(self.lessons.catalog, self.workspace) if self.lessons else None
         self._out = out
         self._write_lock = threading.Lock()
         self._jobs: queue.Queue[dict[str, Any] | None] = queue.Queue()
@@ -75,7 +78,8 @@ class Server:
             self.kernel.shutdown()
             return False
         elif op in ("execute", "run_file", "run_tests", "restart", "check_lesson",
-                    "list_lessons", "open_lesson", "submit_prediction"):
+                    "list_lessons", "open_lesson", "submit_prediction",
+                    "get_review", "answer_warmup"):
             self._jobs.put(request)
         else:
             self.send({"type": "error", "id": request.get("id"), "ename": "ProtocolError",
@@ -116,7 +120,8 @@ class Server:
             report = self._test(self._resolve(request.get("target", ".")))
             emit({"type": "test_report", **report})
             return "ok" if report["outcome"] == "passed" else "error"
-        if op in ("list_lessons", "open_lesson", "submit_prediction", "check_lesson"):
+        if op in ("list_lessons", "open_lesson", "submit_prediction", "check_lesson",
+                  "get_review", "answer_warmup"):
             return self._lesson_op(op, request, emit)
         if op == "restart":
             self.kernel.restart()
@@ -193,12 +198,20 @@ class Server:
             self.lessons.catalog.reload()
             emit({"type": "lessons", "modules": self.lessons.summary()})
             return "ok"
+        if op == "get_review":
+            emit(self._review_event())
+            return "ok"
+        if op == "answer_warmup":
+            result = self.review.answer(request["warmup"], request["value"])
+            emit(self._review_event(result))
+            return "ok"
         lesson_id = str(request["lesson"])
         if op == "open_lesson":
             emit({"type": "lesson", "lesson": self.lessons.open(lesson_id)})
             return "ok"
         if op == "submit_prediction":
-            emit({"type": "lesson", "lesson": self.lessons.predict(lesson_id, request["value"])})
+            emit({"type": "lesson", "lesson": self.lessons.predict(
+                lesson_id, request["value"], request.get("confidence"))})
             return "ok"
         # check_lesson: hidden tests against the learner's file, then progress.
         lesson = self.lessons.catalog.lesson(lesson_id)
@@ -209,7 +222,15 @@ class Server:
         self.lessons.record_check(lesson_id, report)
         emit({"type": "lesson", "lesson": self.lessons.detail(lesson_id)})
         emit({"type": "lessons", "modules": self.lessons.summary()})
+        emit(self._review_event())
         return "ok" if report["outcome"] == "passed" else "error"
+
+    def _review_event(self, result: dict[str, Any] | None = None) -> dict[str, Any]:
+        return {"type": "review", "review": {
+            "warmups": self.review.queue(),
+            "score": self.review.score(),
+            "result": result,
+        }}
 
     def _resolve(self, path: str) -> str:
         full = os.path.abspath(os.path.join(self.workspace, path))

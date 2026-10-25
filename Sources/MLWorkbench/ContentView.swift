@@ -11,7 +11,9 @@ struct ContentView: View {
             FileList()
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220)
         } detail: {
-            if model.lesson != nil {
+            if model.selection == .home {
+                HomeView()
+            } else if model.lesson != nil {
                 HStack(spacing: 0) {
                     LessonPane()
                         .frame(minWidth: 320, idealWidth: 400, maxWidth: 460)
@@ -115,6 +117,13 @@ private struct FileList: View {
 
     var body: some View {
         List(selection: $model.selection) {
+            Label {
+                Text("Home")
+            } icon: {
+                Image(systemName: "house")
+            }
+            .badge(model.review?.warmups.count ?? 0)
+            .tag(SidebarItem.home)
             ForEach(model.modules) { module in
                 Section("\(module.number). \(module.title)") {
                     ForEach(module.lessons) { lesson in

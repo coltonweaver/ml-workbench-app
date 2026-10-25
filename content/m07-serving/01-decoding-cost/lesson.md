@@ -24,6 +24,12 @@ mutants:
   - name: never crops the context
     file: m07/decoding.py
     replace: ["logits = model(idx[:, -model.block_size:])", "logits = model(idx)"]
+warmups:
+  - kind: number
+    prompt: "A 7B-parameter model in bf16 on a GPU with 1 TB/s of memory bandwidth, batch size 1. About how many milliseconds per token, if decoding is memory-bound?"
+    answer: 14
+    tolerance: 0.05
+    explain: "Each token reads every weight once: 14 GB / 1 TB/s = 14 ms. Batching more sequences shares that read, which is why serving batches."
 ---
 
 ## Hook

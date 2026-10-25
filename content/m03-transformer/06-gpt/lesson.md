@@ -25,6 +25,12 @@ mutants:
   - name: skips the final layer norm
     file: m03/gpt.py
     replace: ["return self.ln_f(x) @ self.lm_head", "return x @ self.lm_head"]
+warmups:
+  - kind: number
+    prompt: "Vocabulary 65, n_embd 64. How many parameters in the token embedding table?"
+    answer: 4160
+    tolerance: 0.01
+    explain: "65 × 64 = 4160: one 64-number row per token."
 ---
 
 ## Hook

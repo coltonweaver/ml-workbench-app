@@ -20,6 +20,12 @@ mutants:
   - name: bubble formula without the fill
     file: m08/pipeline.py
     replace: ["return (stages - 1) / (microbatches + stages - 1)", "return (stages - 1) / microbatches"]
+warmups:
+  - kind: number
+    prompt: "GPipe with 2 stages and 3 micro-batches. What fraction of stage-time is bubble?"
+    answer: 0.25
+    tolerance: 0.02
+    explain: "(p − 1) / (m + p − 1) = 1 / 4. More micro-batches shrink it."
 ---
 
 ## Hook

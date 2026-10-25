@@ -24,6 +24,12 @@ mutants:
   - name: averages batch losses without weights
     file: m02/evaluate.py
     replace: ["total += float(loss.data) * len(X[i:i + batch_size])", "total += float(loss.data) * batch_size"]
+warmups:
+  - kind: choice
+    prompt: "Training loss 1.2 and still falling; validation loss 2.1 and rising for the last few epochs. What's happening?"
+    options: ["Underfitting", "Overfitting", "The learning rate is too low"]
+    answer: 1
+    explain: "The model is getting better at the training set and worse at new data: it's memorizing. Stop earlier, add data, or regularize."
 ---
 
 ## Hook

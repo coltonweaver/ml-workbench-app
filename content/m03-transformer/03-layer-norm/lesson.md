@@ -24,6 +24,12 @@ mutants:
   - name: eps outside the square root
     file: m03/layers.py
     replace: ["(var + self.eps) ** -0.5", "var ** -0.5 + self.eps"]
+warmups:
+  - kind: number
+    prompt: "Layer norm (no gain or bias, ε = 0) of the vector [1, 3]. What is its second element?"
+    answer: 1
+    tolerance: 0.02
+    explain: "Mean 2, variance 1, so the output is [−1, 1]. Layer norm only keeps the shape of the vector, not its scale or offset."
 ---
 
 ## Hook

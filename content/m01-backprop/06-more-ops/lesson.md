@@ -18,6 +18,12 @@ mutants:
   - name: relu passes gradient everywhere
     file: m01/engine.py
     replace: ["(1.0 if self.data > 0 else 0.0)", "1.0"]
+warmups:
+  - kind: number
+    prompt: "What is the derivative of the sigmoid σ(x) = 1 / (1 + e^−x) at x = 0?"
+    answer: 0.25
+    tolerance: 0.02
+    explain: "σ′(x) = σ(x)(1 − σ(x)) = 0.5 · 0.5. That 0.25 is the most a sigmoid ever passes back, which is one reason deep sigmoid nets learned slowly."
 ---
 
 ## Hook

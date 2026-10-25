@@ -24,6 +24,17 @@ mutants:
   - name: softmax over the queries
     file: m03/attention.py
     replace: ["weights = softmax(scores, axis=-1)", "weights = softmax(scores, axis=-2)"]
+warmups:
+  - kind: number
+    prompt: "With a causal mask, how many (query, key) pairs may attend in a sequence of 4 tokens?"
+    answer: 10
+    tolerance: 0.01
+    explain: "Token i sees tokens 1…i: 1 + 2 + 3 + 4 = 10, the lower triangle including the diagonal."
+  - kind: number
+    prompt: "Head size 64. Scaled dot-product attention divides the scores by what?"
+    answer: 8
+    tolerance: 0.01
+    explain: "√64 = 8. A dot product of two random unit-variance vectors of size d has variance d, so dividing by √d keeps the softmax out of saturation."
 ---
 
 ## Hook

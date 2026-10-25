@@ -95,6 +95,14 @@ schedules and the pipeline bubble, fp16 underflow and loss scaling, and
 checkpointing, crashes, stragglers and backup workers. `workbench.dist.launch(fn, world_size)`
 starts the ranks (gloo on localhost) and returns what each one returned.
 
+The home screen keeps the review queue and your prediction score. A
+concept you fail checks on in two separate runs comes back next session as
+a short warm-up problem, drawn from the lessons that teach it (36 authored
+warm-ups, plus every lesson's own prediction question). When you lock in a
+prediction you can say how sure you are; the home screen scores that for
+calibration (hit rate per confidence level against the diagonal, Brier
+score, and whether you're over- or underconfident).
+
 Lessons live in [`content/`](content/README.md) as Markdown with YAML front
 matter. Each lesson goes problem, prediction, build, hidden-test check, then
 the explanation. Progress is kept in `progress.json` in your workspace, and

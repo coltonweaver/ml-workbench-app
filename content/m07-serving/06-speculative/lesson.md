@@ -24,6 +24,12 @@ mutants:
   - name: off-by-one target positions
     file: m07/speculative.py
     replace: ["choices = logits[-(k + 1):].argmax(-1)", "choices = logits[-k:].argmax(-1)"]
+warmups:
+  - kind: number
+    prompt: "Speculative decoding with 1 draft token and an acceptance rate of 0.5. Expected tokens per verification step?"
+    answer: 1.5
+    tolerance: 0.02
+    explain: "(1 − α^(γ+1)) / (1 − α) = 0.75 / 0.5 = 1.5: the target model's own token always comes out, plus the draft half the time."
 ---
 
 ## Hook

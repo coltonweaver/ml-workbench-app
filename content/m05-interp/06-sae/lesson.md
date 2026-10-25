@@ -27,6 +27,12 @@ mutants:
   - name: forgets the sparsity penalty
     file: m05/sae.py
     replace: ["return mse + l1 * f.abs().sum(-1).mean(), x_hat, f", "return mse, x_hat, f"]
+warmups:
+  - kind: choice
+    prompt: "You raise the L1 coefficient of a sparse autoencoder. What happens to the number of active features per input?"
+    options: ["It goes up", "It goes down", "It doesn't change"]
+    answer: 1
+    explain: "A bigger L1 penalty makes every active feature cost more, so fewer fire; reconstruction error goes up in exchange."
 ---
 
 ## Hook
