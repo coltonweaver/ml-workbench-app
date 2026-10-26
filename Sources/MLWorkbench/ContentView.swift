@@ -205,90 +205,96 @@ private struct Sidebar: View {
     }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 1) {
-                    SidebarRow(selected: model.selection == .home) {
-                        model.selection = .home
-                    } label: {
-                        Image(systemName: "house")
-                            .frame(width: 18)
-                        Text("Home")
-                        Spacer(minLength: 4)
-                        if let count = model.review?.warmups.count, count > 0 {
-                            Text("\(count)")
-                                .font(.system(size: 10.5, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 1)
-                                .background(Theme.accent, in: Capsule())
-                                .help("\(count) warm-up\(count == 1 ? "" : "s") waiting")
+        VStack(spacing: 0) {
+            // Keeps the scroll view off the title bar. Touching it, the scroll
+            // view appeared to take the title bar inset twice: rows drew lower
+            // than SwiftUI placed them, so hover landed on the wrong row.
+            Color.clear.frame(height: 1)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 1) {
+                        SidebarRow(selected: model.selection == .home) {
+                            model.selection = .home
+                        } label: {
+                            Image(systemName: "house")
+                                .frame(width: 18)
+                            Text("Home")
+                            Spacer(minLength: 4)
+                            if let count = model.review?.warmups.count, count > 0 {
+                                Text("\(count)")
+                                    .font(.system(size: 10.5, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 1)
+                                    .background(Theme.accent, in: Capsule())
+                                    .help("\(count) warm-up\(count == 1 ? "" : "s") waiting")
+                            }
                         }
-                    }
 
-                    ForEach(model.modules) { module in
-                        let passed = module.lessons.filter { $0.status == "passed" }.count
-                        SidebarHeader(title: module.title, expanded: !collapsed.contains(module.id),
-                                      detail: "\(passed)/\(module.lessons.count)") {
-                            toggle(module.id)
-                        }
-                        if !collapsed.contains(module.id) {
-                            ForEach(module.lessons) { lesson in
-                                SidebarRow(selected: model.selection == .lesson(lesson.id)) {
-                                    model.selection = .lesson(lesson.id)
-                                } label: {
-                                    StatusGlyph(status: lesson.status)
-                                        .font(.system(size: 13))
-                                        .frame(width: 18)
-                                    Text(lesson.id)
-                                        .monospacedDigit()
-                                        .foregroundStyle(Theme.Palette.secondaryText)
-                                        .frame(minWidth: 26, alignment: .leading)
-                                    Text(lesson.title)
-                                        .lineLimit(1)
-                                        .truncationMode(.tail)
+                        ForEach(model.modules) { module in
+                            let passed = module.lessons.filter { $0.status == "passed" }.count
+                            SidebarHeader(title: module.title, expanded: !collapsed.contains(module.id),
+                                          detail: "\(passed)/\(module.lessons.count)") {
+                                toggle(module.id)
+                            }
+                            if !collapsed.contains(module.id) {
+                                ForEach(module.lessons) { lesson in
+                                    SidebarRow(selected: model.selection == .lesson(lesson.id)) {
+                                        model.selection = .lesson(lesson.id)
+                                    } label: {
+                                        StatusGlyph(status: lesson.status)
+                                            .font(.system(size: 13))
+                                            .frame(width: 18)
+                                        Text(lesson.id)
+                                            .monospacedDigit()
+                                            .foregroundStyle(Theme.Palette.secondaryText)
+                                            .frame(minWidth: 26, alignment: .leading)
+                                        Text(lesson.title)
+                                            .lineLimit(1)
+                                            .truncationMode(.tail)
+                                    }
+                                    .id(SidebarItem.lesson(lesson.id))
                                 }
-                                .id(SidebarItem.lesson(lesson.id))
                             }
                         }
-                    }
 
-                    SidebarHeader(title: "Files", expanded: filesExpanded, detail: nil) {
-                        withAnimation(Theme.Motion.snappy) { filesExpanded.toggle() }
-                    }
-                    if filesExpanded {
-                        ForEach(model.files, id: \.self) { path in
-                            SidebarRow(selected: model.selection == .file(path)) {
-                                model.selection = .file(path)
-                            } label: {
-                                Image(systemName: path.contains("test_") ? "checkmark.seal" : "doc.text")
-                                    .frame(width: 18)
-                                    .foregroundStyle(Theme.Palette.secondaryText)
-                                Text(path)
-                                    .font(.system(size: 12, design: .monospaced))
-                                    .lineLimit(1)
-                                    .truncationMode(.head)
+                        SidebarHeader(title: "Files", expanded: filesExpanded, detail: nil) {
+                            withAnimation(Theme.Motion.snappy) { filesExpanded.toggle() }
+                        }
+                        if filesExpanded {
+                            ForEach(model.files, id: \.self) { path in
+                                SidebarRow(selected: model.selection == .file(path)) {
+                                    model.selection = .file(path)
+                                } label: {
+                                    Image(systemName: path.contains("test_") ? "checkmark.seal" : "doc.text")
+                                        .frame(width: 18)
+                                        .foregroundStyle(Theme.Palette.secondaryText)
+                                    Text(path)
+                                        .font(.system(size: 12, design: .monospaced))
+                                        .lineLimit(1)
+                                        .truncationMode(.head)
+                                }
                             }
                         }
                     }
+                    .padding(.horizontal, 10)
+                    .padding(.top, 6)
+                    .padding(.bottom, 12)
                 }
-                .padding(.horizontal, 10)
-                .padding(.top, 6)
-                .padding(.bottom, 12)
-            }
-            .coordinateSpace(.named(SidebarHover.space))
-            .onPreferenceChange(SidebarHover.Frames.self) { hoverFrames = $0 }
-            .onContinuousHover(coordinateSpace: .named(SidebarHover.space)) { phase in
-                switch phase {
-                case .active(let point): pointer = point
-                case .ended: pointer = nil
+                .coordinateSpace(.named(SidebarHover.space))
+                .onPreferenceChange(SidebarHover.Frames.self) { hoverFrames = $0 }
+                .onContinuousHover(coordinateSpace: .named(SidebarHover.space)) { phase in
+                    switch phase {
+                    case .active(let point): pointer = point
+                    case .ended: pointer = nil
+                    }
                 }
-            }
-            .environment(\.sidebarHovered, hovered)
-            .thinScrollBar()
-            .onAppear {
-                if let selection = model.selection, case .lesson = selection {
-                    proxy.scrollTo(selection, anchor: .center)
+                .environment(\.sidebarHovered, hovered)
+                .thinScrollBar()
+                .onAppear {
+                    if let selection = model.selection, case .lesson = selection {
+                        proxy.scrollTo(selection, anchor: .center)
+                    }
                 }
             }
         }
