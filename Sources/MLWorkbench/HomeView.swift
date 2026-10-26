@@ -264,8 +264,8 @@ private struct CalibrationChart: View {
             .chartYScale(domain: 0...1)
             .chartXAxisLabel("How sure you said you were")
             .chartYAxisLabel("How often you were right")
-            .chartXAxis { AxisMarks(values: [0, 0.5, 0.7, 0.9, 1]) { AxisGridLine(); AxisValueLabel(format: .percent) } }
-            .chartYAxis { AxisMarks(values: [0, 0.25, 0.5, 0.75, 1]) { AxisGridLine(); AxisValueLabel(format: .percent) } }
+            .chartXAxis { AxisMarks(values: [0.0, 0.5, 0.7, 0.9, 1.0]) { AxisGridLine(); AxisValueLabel(format: FloatingPointFormatStyle<Double>.Percent()) } }
+            .chartYAxis { AxisMarks(values: [0.0, 0.25, 0.5, 0.75, 1.0]) { AxisGridLine(); AxisValueLabel(format: FloatingPointFormatStyle<Double>.Percent()) } }
         }
     }
 }
@@ -287,7 +287,7 @@ private struct RunningHitRateChart: View {
             }
             .chartYScale(domain: 0...1)
             .chartXAxisLabel("Predictions, oldest first")
-            .chartYAxis { AxisMarks(values: [0, 0.5, 1]) { AxisGridLine(); AxisValueLabel(format: .percent) } }
+            .chartYAxis { AxisMarks(values: [0.0, 0.5, 1.0]) { AxisGridLine(); AxisValueLabel(format: FloatingPointFormatStyle<Double>.Percent()) } }
         }
     }
 }
