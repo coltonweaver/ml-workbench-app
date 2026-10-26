@@ -107,8 +107,8 @@ struct TutorPanel: View {
                     }
                 }
                 .padding(14)
-                .overlayScrollers()
             }
+            .thinScrollBar()
             .onChange(of: model.tutor.messages.last?.text) { _, _ in
                 if let last = model.tutor.messages.last?.id {
                     proxy.scrollTo(last, anchor: .bottom)

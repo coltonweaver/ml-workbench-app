@@ -21,8 +21,8 @@ struct HomeView: View {
             .padding(.bottom, Theme.Space.xxl)
             .frame(maxWidth: 900, alignment: .leading)
             .frame(maxWidth: .infinity)
-            .overlayScrollers()
         }
+        .thinScrollBar()
         .background(Theme.Palette.background)
     }
 }

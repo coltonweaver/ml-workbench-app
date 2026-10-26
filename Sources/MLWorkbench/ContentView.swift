@@ -42,8 +42,7 @@ struct ContentView: View {
                 .tint(Theme.accent)
         }
         .toolbar { WorkbenchToolbar(model: model) }
-        .toolbarBackground(Theme.Palette.background, for: .windowToolbar)
-        .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
+        .solidToolbarBeforeGlass()
         .tint(Theme.accent)
         .navigationTitle(title)
         .navigationSubtitle(subtitle)
@@ -198,7 +197,7 @@ private struct Sidebar: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 1) {
                     SidebarRow(selected: model.selection == .home) {
                         model.selection = .home
                     } label: {
@@ -267,16 +266,15 @@ private struct Sidebar: View {
                 .padding(.horizontal, 10)
                 .padding(.top, 6)
                 .padding(.bottom, 12)
-                .overlayScrollers()
             }
-            .scrollIndicators(.automatic)
+            .thinScrollBar()
             .onAppear {
                 if let selection = model.selection, case .lesson = selection {
                     proxy.scrollTo(selection, anchor: .center)
                 }
             }
         }
-        .background(Theme.Palette.sidebar.ignoresSafeArea())
+        .background { SidebarBackdrop() }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             WorkspaceFooter()
         }
@@ -308,7 +306,7 @@ private struct SidebarRow<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(selected ? Theme.Palette.selection : hovering ? Theme.Palette.hover : Color.clear)
+                    .fill(Color.primary.opacity(selected ? 0.09 : hovering ? 0.05 : 0))
             }
             .contentShape(Rectangle())
         }
@@ -383,9 +381,8 @@ private struct WorkspaceFooter: View {
         .foregroundStyle(Theme.Palette.secondaryText)
         .padding(.horizontal, 18)
         .padding(.vertical, 10)
-        .background(Theme.Palette.sidebar)
         .overlay(alignment: .top) {
-            Rectangle().fill(Theme.Palette.border).frame(height: 1)
+            Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 1)
         }
     }
 }
@@ -548,8 +545,8 @@ private struct OutputLog: View {
                     }
                     .padding(.horizontal, Theme.Space.m)
                     .padding(.vertical, Theme.Space.s)
-                    .overlayScrollers()
                 }
+                .thinScrollBar()
                 .onChange(of: chunks) { _, chunks in
                     if let last = chunks.last {
                         withAnimation(Theme.Motion.snappy) { proxy.scrollTo(last.id, anchor: .bottom) }
@@ -610,8 +607,8 @@ private struct TestResults: View {
                     }
                 }
                 .padding(Theme.Space.m)
-                .overlayScrollers()
             }
+            .thinScrollBar()
         } else if running {
             VStack(spacing: 10) {
                 ProgressView().controlSize(.small)
@@ -762,5 +759,44 @@ private struct KernelStatus: View {
     private var help: String {
         if case .failed(let reason) = state { return "Kernel failed: \(reason)" }
         return "Python kernel: \(state.label)"
+    }
+}
+
+/// The sidebar's backing. On macOS 26 the split view floats the sidebar on
+/// Liquid Glass, so this stays clear; earlier systems get the translucent
+/// sidebar material that shows the desktop through.
+private struct SidebarBackdrop: View {
+    var body: some View {
+        if #available(macOS 26.0, *) {
+            Color.clear
+        } else {
+            SidebarMaterial().ignoresSafeArea()
+        }
+    }
+}
+
+private struct SidebarMaterial: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .sidebar
+        view.blendingMode = .behindWindow
+        view.state = .followsWindowActiveState
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
+}
+
+private extension View {
+    /// Before macOS 26 the toolbar takes the content colour; on 26 it is
+    /// left to the system so glass and the scroll edge effect show.
+    @ViewBuilder
+    func solidToolbarBeforeGlass() -> some View {
+        if #available(macOS 26.0, *) {
+            self
+        } else {
+            toolbarBackground(Theme.Palette.background, for: .windowToolbar)
+                .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
+        }
     }
 }

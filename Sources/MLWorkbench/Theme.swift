@@ -204,37 +204,64 @@ private struct StyledButton: View {
     }
 }
 
-/// Keeps scroll bars thin and floating, as in the Claude app, even when the
-/// system shows legacy scroll bars (a mouse is attached). Put it in the
-/// background of a ScrollView's content.
-struct OverlayScrollers: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView { Probe() }
-    func updateNSView(_ view: NSView, context: Context) {}
+/// A thin scroll bar that floats over the content and fades out when idle,
+/// as in the Claude app, whatever the system scroll bar setting. Drawn in
+/// SwiftUI: reaching into the NSScrollView put hover tracking out of step
+/// with the rows.
+struct ThinScrollBar: ViewModifier {
+    private struct Metrics: Equatable {
+        var offset: CGFloat = 0
+        var content: CGFloat = 0
+        var visible: CGFloat = 0
+    }
 
-    final class Probe: NSView {
-        private var observer: NSObjectProtocol?
+    @State private var metrics = Metrics()
+    @State private var active = false
+    @State private var hovering = false
+    @State private var fade: Task<Void, Never>?
 
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            apply()
-            if observer == nil {
-                observer = NotificationCenter.default.addObserver(
-                    forName: NSScroller.preferredScrollerStyleDidChangeNotification, object: nil, queue: .main
-                ) { [weak self] _ in self?.apply() }
+    func body(content: Content) -> some View {
+        content
+            .scrollIndicators(.never)
+            .onScrollGeometryChange(for: Metrics.self) { geo in
+                Metrics(offset: geo.contentOffset.y + geo.contentInsets.top,
+                        content: geo.contentSize.height,
+                        visible: geo.containerSize.height - geo.contentInsets.top - geo.contentInsets.bottom)
+            } action: { old, new in
+                metrics = new
+                if old.offset != new.offset { flash() }
             }
-        }
-
-        deinit {
-            if let observer { NotificationCenter.default.removeObserver(observer) }
-        }
-
-        private func apply() {
-            // After SwiftUI has finished setting the scroll view up.
-            DispatchQueue.main.async { [weak self] in
-                guard let scroll = self?.enclosingScrollView else { return }
-                scroll.scrollerStyle = .overlay
-                scroll.autohidesScrollers = true
+            .onHover { hovering = $0 }
+            .overlay(alignment: .topTrailing) {
+                GeometryReader { proxy in
+                    if let thumb = thumb(in: proxy.size.height) {
+                        Capsule()
+                            .fill(Color.primary.opacity(0.28))
+                            .frame(width: 5, height: thumb.height)
+                            .offset(x: -3, y: thumb.y)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .opacity(active || hovering ? 1 : 0)
+                            .animation(.easeOut(duration: 0.25), value: active || hovering)
+                    }
+                }
+                .allowsHitTesting(false)
             }
+    }
+
+    private func thumb(in height: CGFloat) -> (y: CGFloat, height: CGFloat)? {
+        guard metrics.content > metrics.visible + 1, metrics.visible > 0 else { return nil }
+        let track = height - 6
+        let size = max(28, track * metrics.visible / metrics.content)
+        let progress = min(max(metrics.offset / (metrics.content - metrics.visible), 0), 1)
+        return (3 + (track - size) * progress, size)
+    }
+
+    private func flash() {
+        active = true
+        fade?.cancel()
+        fade = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.1))
+            if !Task.isCancelled { active = false }
         }
     }
 }
@@ -262,10 +289,9 @@ extension View {
         buttonStyle(OutlineButtonStyle())
     }
 
-    /// Thin, floating scroll bars for the enclosing ScrollView. Apply to the
-    /// scroll view's content.
-    func overlayScrollers() -> some View {
-        background(OverlayScrollers())
+    /// Thin, floating scroll bar. Apply to the ScrollView itself.
+    func thinScrollBar() -> some View {
+        modifier(ThinScrollBar())
     }
 
     /// Groups glass shapes so they blend and morph together on macOS 26.

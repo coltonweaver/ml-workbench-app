@@ -50,10 +50,10 @@ struct LessonPane: View {
                 .padding(.top, Theme.Space.l)
                 .padding(.bottom, Theme.Space.xxl)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .overlayScrollers()
                 .animation(Theme.Motion.smooth, value: lesson.isPassed)
                 .animation(Theme.Motion.smooth, value: lesson.hasPrediction)
             }
+            .thinScrollBar()
             .background(LessonBackground())
             .overlay { ConfettiBurst(trigger: confetti).ignoresSafeArea() }
             .onChange(of: PassKey(id: lesson.id, passed: lesson.isPassed)) { old, new in
