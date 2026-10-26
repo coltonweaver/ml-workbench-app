@@ -13,13 +13,14 @@ enum EditorTheme {
         return NSFont(descriptor: descriptor, size: fontSize) ?? font
     }()
 
-    static let text = NSColor.dynamic(light: 0x1F1F24, dark: 0xDCDCDF)
-    static let background = NSColor.dynamic(light: 0xFFFFFF, dark: 0x1C1D21)
-    static let gutter = NSColor.dynamic(light: 0xF7F7F9, dark: 0x1C1D21)
-    static let gutterText = NSColor.dynamic(light: 0xA9AAB0, dark: 0x5A5D66)
-    static let gutterCurrent = NSColor.dynamic(light: 0x4A4B52, dark: 0xC9CAD0)
-    static let currentLine = NSColor.dynamic(light: 0xF1F5FD, dark: 0x25272D)
-    static let selection = NSColor.dynamic(light: 0xC9DDFB, dark: 0x3A4A66)
+    // Warm neutrals to sit with the rest of the app.
+    static let text = NSColor.dynamic(light: 0x29261B, dark: 0xE8E6DE)
+    static let background = NSColor.dynamic(light: 0xFFFFFF, dark: 0x1F1E1D)
+    static let gutter = NSColor.dynamic(light: 0xFFFFFF, dark: 0x1F1E1D)
+    static let gutterText = NSColor.dynamic(light: 0xB8B5AA, dark: 0x5C5A54)
+    static let gutterCurrent = NSColor.dynamic(light: 0x5E5D57, dark: 0xC2BFB6)
+    static let currentLine = NSColor.dynamic(light: 0xF7F5EE, dark: 0x292826)
+    static let selection = NSColor.dynamic(light: 0xF3DACD, dark: 0x4D372C)
 
     static func color(for kind: PythonTokenizer.Kind) -> NSColor {
         switch kind {

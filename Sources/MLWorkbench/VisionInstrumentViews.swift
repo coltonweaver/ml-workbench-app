@@ -28,7 +28,7 @@ struct ImagesInstrumentView: View {
                                     .resizable()
                                     .interpolation(.none)
                                     .frame(width: CGFloat(image.width) * zoom, height: CGFloat(image.height) * zoom)
-                                    .border(selected == i ? Color.accentColor : Color.secondary.opacity(0.3),
+                                    .border(selected == i ? Theme.accent : Color.secondary.opacity(0.3),
                                             width: selected == i ? 2 : 0.5)
                             } else {
                                 Text("bad image").font(.caption2).foregroundStyle(.red)

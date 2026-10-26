@@ -50,10 +50,10 @@ struct LessonPane: View {
                 .padding(.top, Theme.Space.l)
                 .padding(.bottom, Theme.Space.xxl)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .overlayScrollers()
                 .animation(Theme.Motion.smooth, value: lesson.isPassed)
                 .animation(Theme.Motion.smooth, value: lesson.hasPrediction)
             }
-            .softScrollEdges()
             .background(LessonBackground())
             .overlay { ConfettiBurst(trigger: confetti).ignoresSafeArea() }
             .onChange(of: PassKey(id: lesson.id, passed: lesson.isPassed)) { old, new in
@@ -65,7 +65,7 @@ struct LessonPane: View {
 
 private struct LessonBackground: View {
     var body: some View {
-        Color(light: NSColor(hex: 0xF6F6F8), dark: NSColor(hex: 0x17181B))
+        Theme.Palette.background
     }
 }
 
@@ -74,17 +74,18 @@ private struct LessonHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Eyebrow("Lesson \(lesson.id) · \(lesson.moduleTitle)", color: .accentColor)
+            Eyebrow("Lesson \(lesson.id) · \(lesson.moduleTitle)", color: Theme.accent)
                 .lineLimit(1)
             Text(lesson.title)
-                .font(Theme.display(26))
+                .font(Theme.display(28))
+                .foregroundStyle(Theme.Palette.text)
                 .fixedSize(horizontal: false, vertical: true)
             if !lesson.concepts.isEmpty {
                 FlowLayout(spacing: 6) {
                     ForEach(lesson.concepts, id: \.self) { concept in
                         Text(concept.replacingOccurrences(of: "_", with: " ").replacingOccurrences(of: "-", with: " "))
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.Palette.secondaryText)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
                             .background(Color.primary.opacity(0.06), in: Capsule())
@@ -127,7 +128,7 @@ private struct StageTrack: View {
             ForEach(Array(stages.enumerated()), id: \.offset) { i, stage in
                 if i > 0 {
                     Capsule()
-                        .fill(stages[i - 1].done ? AnyShapeStyle(stages[i - 1].tint.gradient) : AnyShapeStyle(Color.primary.opacity(0.1)))
+                        .fill(stages[i - 1].done ? AnyShapeStyle(stages[i - 1].tint) : AnyShapeStyle(Color.primary.opacity(0.1)))
                         .frame(height: 2)
                         .frame(maxWidth: .infinity)
                         .padding(.bottom, 16)
@@ -135,7 +136,7 @@ private struct StageTrack: View {
                 VStack(spacing: 4) {
                     ZStack {
                         Circle()
-                            .fill(stage.done ? AnyShapeStyle(stage.tint.gradient) : AnyShapeStyle(Color.primary.opacity(0.06)))
+                            .fill(stage.done ? AnyShapeStyle(stage.tint) : AnyShapeStyle(Color.primary.opacity(0.06)))
                         if i == current {
                             Circle().strokeBorder(stage.tint, lineWidth: 1.5)
                         }
@@ -206,7 +207,7 @@ private struct PredictionCard: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Locked in")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.Palette.secondaryText)
                         Text(display(prediction.value))
                             .font(.system(size: 15, weight: .semibold, design: .rounded))
                             .fixedSize(horizontal: false, vertical: true)
@@ -248,7 +249,6 @@ private struct PredictionCard: View {
                 .padding(.horizontal, 4)
         }
         .prominentButton()
-        .tint(Theme.Stage.predict)
         .controlSize(.large)
         .keyboardShortcut(.return, modifiers: [.command])
         .disabled(model.predictionDraft.trimmingCharacters(in: .whitespaces).isEmpty
@@ -258,7 +258,7 @@ private struct PredictionCard: View {
     private var hint: some View {
         Text("Run and Check unlock once you've predicted.")
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Theme.Palette.secondaryText)
             .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -309,11 +309,10 @@ private struct FieldBox<Content: View>: View {
             .focused($focused)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .background(Color(light: .white, dark: NSColor(white: 0, alpha: 0.25)),
-                        in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .background(Theme.Palette.background, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .strokeBorder(focused ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: focused ? 2 : 1)
+                    .strokeBorder(focused ? Theme.accent : Theme.Palette.border, lineWidth: focused ? 1.5 : 1)
             }
             .animation(Theme.Motion.snappy, value: focused)
     }
@@ -329,7 +328,7 @@ private struct ChoiceRow: View {
         Button(action: action) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Image(systemName: selected ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(selected ? Theme.Stage.predict : Color.secondary)
+                    .foregroundStyle(selected ? Theme.accent : Theme.Palette.secondaryText)
                     .contentTransition(.symbolEffect(.replace))
                 Text(text)
                     .multilineTextAlignment(.leading)
@@ -341,11 +340,11 @@ private struct ChoiceRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(selected ? Theme.Stage.predict.opacity(0.12) : Color.primary.opacity(hovering ? 0.06 : 0.03))
+                    .fill(selected ? Theme.accent.opacity(0.10) : hovering ? Theme.Palette.hover : Theme.Palette.background)
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .strokeBorder(selected ? Theme.Stage.predict.opacity(0.6) : Color.primary.opacity(0.08), lineWidth: 1)
+                    .strokeBorder(selected ? Theme.accent.opacity(0.7) : Theme.Palette.border, lineWidth: 1)
             }
             .contentShape(Rectangle())
         }
@@ -366,7 +365,7 @@ struct ConfidencePicker: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("How sure are you?")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Palette.secondaryText)
             FlowLayout(spacing: 6) {
                 ForEach(Self.levels, id: \.0) { level, label in
                     let selected = confidence == level
@@ -380,12 +379,12 @@ struct ConfidencePicker: View {
                                 .monospacedDigit()
                         }
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(selected ? Color.white : Color.primary)
+                        .foregroundStyle(selected ? Color.white : Theme.Palette.text)
                         .padding(.horizontal, 11)
                         .padding(.vertical, 5)
                         .background {
-                            Capsule().fill(selected ? AnyShapeStyle(Theme.Stage.predict.gradient)
-                                                    : AnyShapeStyle(Color.primary.opacity(0.06)))
+                            Capsule().fill(selected ? AnyShapeStyle(Theme.accent)
+                                                    : AnyShapeStyle(Theme.Palette.hover))
                         }
                         .contentShape(Capsule())
                     }
@@ -411,7 +410,6 @@ private struct CheckBar: View {
                         .padding(.horizontal, 2)
                 }
                 .prominentButton()
-                .tint(Theme.Stage.check)
                 .controlSize(.large)
                 .disabled(!model.canCheck)
                 .help("Run the lesson's hidden tests against \(lesson.file) (⌘K)")
@@ -422,7 +420,7 @@ private struct CheckBar: View {
             .animation(Theme.Motion.snappy, value: model.kernelState)
             Label(lesson.file, systemImage: "doc.text")
                 .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Palette.secondaryText)
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
@@ -434,7 +432,7 @@ private struct CheckBar: View {
         if model.kernelState == .busy {
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
-                Text("Checking…").font(.caption).foregroundStyle(.secondary)
+                Text("Checking…").font(.caption).foregroundStyle(Theme.Palette.secondaryText)
             }
         } else if lesson.isPassed {
             Label("Passed", systemImage: "checkmark.circle.fill")
@@ -444,12 +442,12 @@ private struct CheckBar: View {
             Text(report.outcome == "passed" ? "Passed"
                  : "\(report.failed) of \(report.passed + report.failed) checks failing. See Tests.")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         } else if lesson.progress.attempts > 0 {
             Text("\(lesson.progress.attempts) attempt\(lesson.progress.attempts == 1 ? "" : "s") so far")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Palette.secondaryText)
         }
     }
 }
@@ -467,7 +465,7 @@ private struct PassedCard: View {
                 .symbolEffect(.bounce, value: appeared)
             VStack(alignment: .leading, spacing: 4) {
                 Text("Lesson passed")
-                    .font(Theme.display(17, weight: .semibold))
+                    .font(Theme.display(19))
                 if let feedback {
                     switch feedback.correct {
                     case true?:
@@ -478,10 +476,10 @@ private struct PassedCard: View {
                             .foregroundStyle(Theme.warn)
                     case nil:
                         Label("Compare your prediction with what you found", systemImage: "text.bubble")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.Palette.secondaryText)
                     }
                     Text(summary(feedback))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.Palette.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }

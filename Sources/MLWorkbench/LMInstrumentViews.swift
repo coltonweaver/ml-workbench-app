@@ -335,7 +335,7 @@ struct AttentionInstrumentView: View {
                             }
                             .frame(width: 72, height: 72)
                             .overlay(RoundedRectangle(cornerRadius: 2)
-                                .stroke(pinned == h ? Color.accentColor : .clear, lineWidth: 2))
+                                .stroke(pinned == h ? Theme.accent : .clear, lineWidth: 2))
                             Text("head \(h)").font(.caption2)
                                 .foregroundStyle(pinned == h ? .primary : .secondary)
                         }

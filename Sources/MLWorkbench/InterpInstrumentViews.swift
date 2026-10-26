@@ -28,7 +28,7 @@ struct HighlightedTokens: View {
                     .background(divergingColor(signedFraction(v ?? 0, magnitude: magnitude)))
                     .overlay(alignment: .bottom) {
                         if i == highlight {
-                            Rectangle().fill(Color.accentColor).frame(height: 2)
+                            Rectangle().fill(Theme.accent).frame(height: 2)
                         }
                     }
                     .foregroundStyle(.black)
@@ -254,7 +254,7 @@ struct AttributionInstrumentView: View {
                     if let target = payload.target, target.pos < cols {
                         let rect = CGRect(x: labelWidth + CGFloat(target.pos) * cell, y: 20,
                                           width: cell - 1, height: CGFloat(rows) * cell - 1)
-                        context.stroke(Path(rect), with: .color(.accentColor), lineWidth: 2)
+                        context.stroke(Path(rect), with: .color(Theme.accent), lineWidth: 2)
                     }
                 }
                 .frame(width: labelWidth + CGFloat(cols) * cell, height: 22 + CGFloat(rows) * cell)
@@ -331,7 +331,7 @@ struct AttributionGraphView: View {
                             let r: CGFloat = 7 + 9 * CGFloat(abs(node.effect) / maxEffect)
                             let rect = CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)
                             context.fill(Path(ellipseIn: rect), with: .color(divergingColor(signedFraction(node.effect, magnitude: maxEffect))))
-                            context.stroke(Path(ellipseIn: rect), with: .color(selected == i ? .accentColor : .secondary),
+                            context.stroke(Path(ellipseIn: rect), with: .color(selected == i ? Theme.accent : .secondary),
                                            lineWidth: selected == i ? 2 : 0.5)
                             let label = node.component < payload.components.count ? payload.components[node.component] : "?"
                             context.draw(Text(label).font(.caption2.monospaced()).foregroundColor(.black), at: p)

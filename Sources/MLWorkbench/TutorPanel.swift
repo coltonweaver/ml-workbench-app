@@ -36,17 +36,20 @@ struct TutorPanel: View {
             input
         }
         .frame(minWidth: 300)
+        .background(Theme.Palette.background)
         .animation(Theme.Motion.smooth, value: model.tutor.messages.count)
     }
 
     private var header: some View {
         HStack(spacing: 8) {
-            IconTile(systemImage: "graduationcap.fill", tint: .indigo, size: 24)
+            Image(systemName: "asterisk")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.accent)
             VStack(alignment: .leading, spacing: 0) {
                 Text("Tutor").font(.system(size: 13, weight: .semibold))
                 Text(model.tutor.isAnswering ? "Thinking…" : "Coaches, doesn't hand out answers")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Palette.secondaryText)
                     .contentTransition(.opacity)
             }
             Spacer()
@@ -65,15 +68,15 @@ struct TutorPanel: View {
 
     private var emptyState: some View {
         VStack(spacing: Theme.Space.m) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 30, weight: .light))
-                .foregroundStyle(.indigo.gradient)
+            Image(systemName: "asterisk")
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundStyle(Theme.accent)
                 .symbolEffect(.pulse, options: .repeating.speed(0.4))
             Text("Ask about this lesson")
-                .font(Theme.display(16, weight: .semibold))
+                .font(Theme.display(22))
             Text("The tutor sees your lesson, your file, your last error and your prediction. Use Explain on an instrument to ask about a tensor.")
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Palette.secondaryText)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             VStack(spacing: 6) {
@@ -82,13 +85,9 @@ struct TutorPanel: View {
                         model.askTutor(suggestion)
                     } label: {
                         Text(suggestion)
-                            .font(.system(size: 12, weight: .medium))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.plain)
-                    .glassCapsule(interactive: true)
+                    .secondaryButton()
                 }
             }
             .padding(.top, 4)
@@ -108,8 +107,8 @@ struct TutorPanel: View {
                     }
                 }
                 .padding(14)
+                .overlayScrollers()
             }
-            .softScrollEdges()
             .onChange(of: model.tutor.messages.last?.text) { _, _ in
                 if let last = model.tutor.messages.last?.id {
                     proxy.scrollTo(last, anchor: .bottom)
@@ -131,7 +130,7 @@ struct TutorPanel: View {
                 Button { model.stopTutor() } label: {
                     Image(systemName: "stop.circle.fill")
                         .font(.system(size: 22))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.Palette.secondaryText)
                 }
                 .help("Stop the answer")
                 .transition(.scale.combined(with: .opacity))
@@ -140,7 +139,7 @@ struct TutorPanel: View {
                 Button { model.askTutor() } label: {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 22))
-                        .foregroundStyle(empty ? AnyShapeStyle(HierarchicalShapeStyle.tertiary) : AnyShapeStyle(Color.accentColor))
+                        .foregroundStyle(empty ? AnyShapeStyle(HierarchicalShapeStyle.tertiary) : AnyShapeStyle(Theme.accent))
                 }
                 .disabled(empty || !model.hasAPIKey)
                 .keyboardShortcut(.return, modifiers: .command)
@@ -152,9 +151,13 @@ struct TutorPanel: View {
         .font(.body)
         .padding(.leading, 14)
         .padding(.trailing, 6)
-        .padding(.vertical, 6)
-        .glassSurface(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .padding(10)
+        .padding(.vertical, 8)
+        .background(Theme.Palette.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(inputFocused ? Theme.accent.opacity(0.6) : Theme.Palette.border, lineWidth: 1)
+        }
+        .padding(12)
         .animation(Theme.Motion.snappy, value: model.tutor.isAnswering)
         .onAppear { inputFocused = true }
     }
@@ -169,10 +172,10 @@ private struct TutorMessageView: View {
             if message.role == .user {
                 Text(message.text)
                     .textSelection(.enabled)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.Palette.text)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(Color.accentColor.gradient, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(Theme.Palette.selection, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .padding(.leading, 40)
             } else if message.isError {
@@ -184,16 +187,15 @@ private struct TutorMessageView: View {
                 TypingDots()
             } else {
                 HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white)
+                    Image(systemName: "asterisk")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.accent)
                         .frame(width: 20, height: 20)
-                        .background(Color.indigo.gradient, in: Circle())
                     MarkdownView(source: message.text)
                 }
             }
             if let note = message.note {
-                Text(note).font(.caption).foregroundStyle(.secondary)
+                Text(note).font(.caption).foregroundStyle(Theme.Palette.secondaryText)
             }
         }
     }
@@ -237,14 +239,14 @@ struct SettingsView: View {
                     Button("Remove") { model.saveAPIKey("") }
                     Spacer()
                     Text(model.hasAPIKey ? "A key is set." : "No key yet.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.Palette.secondaryText)
                 }
             } header: {
                 Text("Tutor")
             } footer: {
                 Text("Get a key at console.anthropic.com. It's stored in your login Keychain and sent only to the Claude API. ANTHROPIC_API_KEY in the environment also works.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Palette.secondaryText)
             }
         }
         .formStyle(.grouped)

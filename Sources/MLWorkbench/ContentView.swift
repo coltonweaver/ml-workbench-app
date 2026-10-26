@@ -34,12 +34,17 @@ struct ContentView: View {
                 }
             }
             .animation(Theme.Motion.smooth, value: screen)
+            .background(Theme.Palette.background)
         }
         .inspector(isPresented: $model.showTutor) {
             TutorPanel()
                 .inspectorColumnWidth(min: 300, ideal: 360, max: 520)
+                .tint(Theme.accent)
         }
         .toolbar { WorkbenchToolbar(model: model) }
+        .toolbarBackground(Theme.Palette.background, for: .windowToolbar)
+        .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
+        .tint(Theme.accent)
         .navigationTitle(title)
         .navigationSubtitle(subtitle)
         .onChange(of: scenePhase) { _, phase in
@@ -172,6 +177,9 @@ struct EditorOutputSplit: View {
 
 // MARK: - Sidebar
 
+/// The sidebar, drawn by hand rather than with List so it can look like the
+/// Claude app's: quiet selection and hover fills, small gray section
+/// headers that fold, and a thin floating scroll bar.
 private struct Sidebar: View {
     @EnvironmentObject private var model: AppModel
     @AppStorage("collapsedModules") private var collapsedRaw = ""
@@ -181,114 +189,168 @@ private struct Sidebar: View {
         Set(collapsedRaw.split(separator: ",").map(String.init))
     }
 
-    private func expanded(_ id: String) -> Binding<Bool> {
-        Binding(
-            get: { !collapsed.contains(id) },
-            set: { open in
-                var set = collapsed
-                if open { set.remove(id) } else { set.insert(id) }
-                collapsedRaw = set.sorted().joined(separator: ",")
-            }
-        )
+    private func toggle(_ id: String) {
+        var set = collapsed
+        if set.contains(id) { set.remove(id) } else { set.insert(id) }
+        withAnimation(Theme.Motion.snappy) { collapsedRaw = set.sorted().joined(separator: ",") }
     }
 
     var body: some View {
-        List(selection: $model.selection) {
-            HStack(spacing: 10) {
-                IconTile(systemImage: "house.fill", tint: .accentColor, size: 22)
-                Text("Home")
-                    .font(.system(size: 13, weight: .medium))
-                Spacer()
-                if let count = model.review?.warmups.count, count > 0 {
-                    Text("\(count)")
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1)
-                        .background(Theme.warn, in: Capsule())
-                        .help("\(count) warm-up\(count == 1 ? "" : "s") waiting")
-                }
-            }
-            .padding(.vertical, 2)
-            .tag(SidebarItem.home)
-
-            ForEach(model.modules) { module in
-                Section(isExpanded: expanded(module.id)) {
-                    ForEach(module.lessons) { lesson in
-                        LessonRow(lesson: lesson)
-                            .tag(SidebarItem.lesson(lesson.id))
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 1) {
+                    SidebarRow(selected: model.selection == .home) {
+                        model.selection = .home
+                    } label: {
+                        Image(systemName: "house")
+                            .frame(width: 18)
+                        Text("Home")
+                        Spacer(minLength: 4)
+                        if let count = model.review?.warmups.count, count > 0 {
+                            Text("\(count)")
+                                .font(.system(size: 10.5, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 1)
+                                .background(Theme.accent, in: Capsule())
+                                .help("\(count) warm-up\(count == 1 ? "" : "s") waiting")
+                        }
                     }
-                } header: {
-                    ModuleHeader(module: module)
-                }
-            }
 
-            Section(isExpanded: $filesExpanded) {
-                ForEach(model.files, id: \.self) { path in
-                    Label {
-                        Text(path)
-                            .font(.system(size: 12, design: .monospaced))
-                            .lineLimit(1)
-                            .truncationMode(.head)
-                    } icon: {
-                        Image(systemName: path.contains("test_") ? "checkmark.seal" : "doc.text")
-                            .foregroundStyle(.secondary)
+                    ForEach(model.modules) { module in
+                        let passed = module.lessons.filter { $0.status == "passed" }.count
+                        SidebarHeader(title: module.title, expanded: !collapsed.contains(module.id),
+                                      detail: "\(passed)/\(module.lessons.count)") {
+                            toggle(module.id)
+                        }
+                        if !collapsed.contains(module.id) {
+                            ForEach(module.lessons) { lesson in
+                                SidebarRow(selected: model.selection == .lesson(lesson.id)) {
+                                    model.selection = .lesson(lesson.id)
+                                } label: {
+                                    StatusGlyph(status: lesson.status)
+                                        .font(.system(size: 13))
+                                        .frame(width: 18)
+                                    Text(lesson.id)
+                                        .monospacedDigit()
+                                        .foregroundStyle(Theme.Palette.secondaryText)
+                                        .frame(minWidth: 26, alignment: .leading)
+                                    Text(lesson.title)
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
+                                }
+                                .id(SidebarItem.lesson(lesson.id))
+                                .help("\(lesson.id) \(lesson.title)")
+                            }
+                        }
                     }
-                    .tag(SidebarItem.file(path))
+
+                    SidebarHeader(title: "Files", expanded: filesExpanded, detail: nil) {
+                        withAnimation(Theme.Motion.snappy) { filesExpanded.toggle() }
+                    }
+                    if filesExpanded {
+                        ForEach(model.files, id: \.self) { path in
+                            SidebarRow(selected: model.selection == .file(path)) {
+                                model.selection = .file(path)
+                            } label: {
+                                Image(systemName: path.contains("test_") ? "checkmark.seal" : "doc.text")
+                                    .frame(width: 18)
+                                    .foregroundStyle(Theme.Palette.secondaryText)
+                                Text(path)
+                                    .font(.system(size: 12, design: .monospaced))
+                                    .lineLimit(1)
+                                    .truncationMode(.head)
+                            }
+                        }
+                    }
                 }
-            } header: {
-                Text("Files")
+                .padding(.horizontal, 10)
+                .padding(.top, 6)
+                .padding(.bottom, 12)
+                .overlayScrollers()
+            }
+            .scrollIndicators(.automatic)
+            .onAppear {
+                if let selection = model.selection, case .lesson = selection {
+                    proxy.scrollTo(selection, anchor: .center)
+                }
             }
         }
-        .listStyle(.sidebar)
-        .animation(Theme.Motion.smooth, value: model.modules)
-        .safeAreaInset(edge: .bottom) {
+        .background(Theme.Palette.sidebar.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             WorkspaceFooter()
         }
     }
 }
 
-private struct ModuleHeader: View {
-    let module: ModuleSummary
+/// One sidebar row: a quiet fill when selected, a fainter one on hover.
+private struct SidebarRow<Content: View>: View {
+    let selected: Bool
+    let action: () -> Void
+    let label: Content
+    @State private var hovering = false
+
+    init(selected: Bool, action: @escaping () -> Void, @ViewBuilder label: () -> Content) {
+        self.selected = selected
+        self.action = action
+        self.label = label()
+    }
 
     var body: some View {
-        let passed = module.lessons.filter { $0.status == "passed" }.count
-        HStack(spacing: 8) {
-            Text("\(module.number)")
-                .font(.system(size: 10, weight: .bold, design: .rounded))
-                .foregroundStyle(.secondary)
-                .frame(width: 18, height: 18)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
-            Text(module.title)
-                .lineLimit(1)
-            Spacer(minLength: 4)
-            ProgressRing(progress: module.lessons.isEmpty ? 0 : Double(passed) / Double(module.lessons.count),
-                         lineWidth: 2.5, tint: passed == module.lessons.count ? Theme.pass : .accentColor)
-                .frame(width: 13, height: 13)
-                .help("\(passed) of \(module.lessons.count) passed")
+        Button(action: action) {
+            HStack(spacing: 8) {
+                label
+            }
+            .font(.system(size: 13))
+            .foregroundStyle(Theme.Palette.text)
+            .padding(.horizontal, 8)
+            .frame(height: 30)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(selected ? Theme.Palette.selection : hovering ? Theme.Palette.hover : Color.clear)
+            }
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
     }
 }
 
-private struct LessonRow: View {
-    let lesson: LessonSummary
+/// A small gray section title with a disclosure chevron, like "Pinned ▾".
+private struct SidebarHeader: View {
+    let title: String
+    let expanded: Bool
+    let detail: String?
+    let action: () -> Void
+    @State private var hovering = false
 
     var body: some View {
-        HStack(spacing: 9) {
-            StatusGlyph(status: lesson.status)
-                .font(.system(size: 14))
-                .frame(width: 18)
-            Text(lesson.id)
-                .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .frame(minWidth: 24, alignment: .leading)
-            Text(lesson.title)
-                .lineLimit(1)
-                .truncationMode(.tail)
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Text(title)
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+                    .rotationEffect(.degrees(expanded ? 0 : -90))
+                    .opacity(hovering || !expanded ? 1 : 0.6)
+                Spacer(minLength: 4)
+                if let detail {
+                    Text(detail)
+                        .monospacedDigit()
+                        .opacity(hovering ? 1 : 0.7)
+                }
+            }
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(Theme.Palette.secondaryText)
+            .padding(.horizontal, 8)
+            .padding(.top, 16)
+            .padding(.bottom, 4)
+            .contentShape(Rectangle())
         }
-        .padding(.vertical, 1)
-        .help("\(lesson.id) \(lesson.title)")
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(Theme.Motion.snappy, value: expanded)
     }
 }
 
@@ -298,11 +360,9 @@ private struct WorkspaceFooter: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "externaldrive")
-                .foregroundStyle(.secondary)
                 .font(.caption)
             Text(model.workspace.root.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 11.5))
                 .lineLimit(1)
                 .truncationMode(.head)
             Spacer()
@@ -320,11 +380,13 @@ private struct WorkspaceFooter: View {
             .help("Refresh file list")
         }
         .buttonStyle(.borderless)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .glassCapsule()
-        .padding(.horizontal, 10)
-        .padding(.bottom, 10)
+        .foregroundStyle(Theme.Palette.secondaryText)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .background(Theme.Palette.sidebar)
+        .overlay(alignment: .top) {
+            Rectangle().fill(Theme.Palette.border).frame(height: 1)
+        }
     }
 }
 
@@ -338,7 +400,7 @@ private struct EditorPane: View {
             ContentUnavailableView("No file open", systemImage: "doc.text",
                                    description: Text("Pick a lesson or a file from the sidebar."))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(nsColor: EditorTheme.background))
+                .background(Theme.Palette.well)
         } else {
             CodeEditor(text: $model.editorText) { code, line, column in
                 await model.completions(code: code, line: line, column: column)
@@ -362,7 +424,7 @@ private struct OutputPane: View {
                         Image(systemName: "trash")
                     }
                     .buttonStyle(.borderless)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Palette.secondaryText)
                     .help("Clear output")
                     .transition(.opacity)
                 }
@@ -381,7 +443,7 @@ private struct OutputPane: View {
             .id(model.outputTab)
         }
         .animation(Theme.Motion.snappy, value: model.outputTab)
-        .background(Color(nsColor: .underPageBackgroundColor).opacity(0.6))
+        .background(Theme.Palette.background)
     }
 }
 
@@ -418,12 +480,12 @@ private struct OutputTabs: View {
                     }
                     .padding(.horizontal, 11)
                     .padding(.vertical, 5)
-                    .foregroundStyle(selected ? Color.primary : Color.secondary)
+                    .foregroundStyle(selected ? Theme.Palette.text : Theme.Palette.secondaryText)
                     .background {
                         if selected {
                             Capsule()
-                                .fill(Color(light: .white, dark: NSColor(white: 1, alpha: 0.14)))
-                                .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
+                                .fill(Theme.Palette.surface)
+                                .overlay(Capsule().strokeBorder(Theme.Palette.border, lineWidth: 1))
                                 .matchedGeometryEffect(id: "pill", in: pill)
                         }
                     }
@@ -433,7 +495,7 @@ private struct OutputTabs: View {
             }
         }
         .padding(3)
-        .background(Color.primary.opacity(0.06), in: Capsule())
+        .background(Theme.Palette.hover, in: Capsule())
     }
 
     @ViewBuilder
@@ -451,7 +513,7 @@ private struct OutputTabs: View {
                 Text("\(model.instruments.count)")
                     .font(.system(size: 10, weight: .semibold))
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Palette.secondaryText)
             }
         case .output:
             if model.output.contains(where: { $0.style == .error }) {
@@ -472,7 +534,7 @@ private struct OutputLog: View {
                     .foregroundStyle(.tertiary)
                 Text("Run your file with ⌘R. Output shows up here.")
                     .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Palette.secondaryText)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
@@ -486,6 +548,7 @@ private struct OutputLog: View {
                     }
                     .padding(.horizontal, Theme.Space.m)
                     .padding(.vertical, Theme.Space.s)
+                    .overlayScrollers()
                 }
                 .onChange(of: chunks) { _, chunks in
                     if let last = chunks.last {
@@ -516,7 +579,7 @@ private struct OutputLog: View {
         case .stderr:
             text.foregroundStyle(Theme.warn)
         case .info:
-            text.foregroundStyle(.secondary)
+            text.foregroundStyle(Theme.Palette.secondaryText)
         case .stdout, .result:
             text.foregroundStyle(.primary)
         }
@@ -547,11 +610,12 @@ private struct TestResults: View {
                     }
                 }
                 .padding(Theme.Space.m)
+                .overlayScrollers()
             }
         } else if running {
             VStack(spacing: 10) {
                 ProgressView().controlSize(.small)
-                Text("Running tests…").font(.callout).foregroundStyle(.secondary)
+                Text("Running tests…").font(.callout).foregroundStyle(Theme.Palette.secondaryText)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
@@ -573,7 +637,7 @@ private struct TestResults: View {
                 if r.passed + r.failed > 0 {
                     Text("\(r.passed) passed · \(r.failed) failed")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.Palette.secondaryText)
                 }
             }
             Spacer()
@@ -619,7 +683,7 @@ private struct TestRow: View {
             if let message = test.message, !test.didPass {
                 Text(message)
                     .font(.system(size: 11.5, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Palette.secondaryText)
                     .textSelection(.enabled)
                     .padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -677,7 +741,7 @@ private struct KernelStatus: View {
                 .symbolEffect(.pulse, options: .repeating, isActive: state == .busy || state == .starting)
             Text(state.label)
                 .font(.system(size: 11.5, weight: .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Palette.secondaryText)
                 .contentTransition(.opacity)
         }
         .padding(.horizontal, 10)

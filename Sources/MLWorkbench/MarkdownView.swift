@@ -25,7 +25,7 @@ struct MarkdownView: View {
         switch block {
         case .heading(let text):
             inline(text)
-                .font(Theme.display(15, weight: .semibold))
+                .font(Theme.display(17, weight: .medium))
                 .padding(.top, 4)
         case .paragraph(let text):
             inline(text)
@@ -36,7 +36,7 @@ struct MarkdownView: View {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         if ordered {
                             Text("\(i + 1).")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.Palette.secondaryText)
                                 .monospacedDigit()
                                 .frame(minWidth: 16, alignment: .trailing)
                         } else {
@@ -83,10 +83,10 @@ private struct CodeBlock: View {
                 .padding(.vertical, 10)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(nsColor: EditorTheme.background), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(Theme.Palette.well, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                .strokeBorder(Theme.Palette.border, lineWidth: 1)
         }
         .overlay(alignment: .topTrailing) {
             if hovering || copied {
@@ -104,7 +104,10 @@ private struct CodeBlock: View {
                         .frame(width: 24, height: 24)
                 }
                 .buttonStyle(.borderless)
-                .glassSurface(Circle(), interactive: true)
+                .background(Theme.Palette.surface, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(Theme.Palette.border, lineWidth: 1)
+                }
                 .padding(6)
                 .transition(.opacity)
                 .help("Copy")
@@ -139,7 +142,7 @@ private struct TableBlock: View {
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                .strokeBorder(Theme.Palette.border, lineWidth: 1)
         }
     }
 }

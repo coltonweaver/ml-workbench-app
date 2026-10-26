@@ -19,7 +19,7 @@ struct InstrumentsPane: View {
                     HStack {
                         Text("\(model.instruments.count) instrument\(model.instruments.count == 1 ? "" : "s")")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.Palette.secondaryText)
                         Spacer()
                         Button("Clear", systemImage: "trash") {
                             withAnimation(Theme.Motion.smooth) { model.clearInstruments() }
@@ -172,7 +172,7 @@ struct GraphInstrumentView: View {
             .frame(maxWidth: 260)
             Text(phase)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Palette.secondaryText)
         }
         .buttonStyle(.borderless)
     }
@@ -210,7 +210,7 @@ struct GraphInstrumentView: View {
                 control2: CGPoint(x: end.x - gap.width / 2, y: end.y)
             )
             let active = edge[1] == reveal.current || (reveal.grads.contains(edge[1]) && edge[0] == reveal.current)
-            context.stroke(path, with: .color(active ? Color.accentColor : Color.secondary.opacity(0.5)),
+            context.stroke(path, with: .color(active ? Theme.accent : Color.secondary.opacity(0.5)),
                            lineWidth: active ? 2 : 1)
         }
         for node in graph.nodes {
@@ -219,7 +219,7 @@ struct GraphInstrumentView: View {
             let shape = RoundedRectangle(cornerRadius: 7).path(in: rect)
             let isCurrent = node.id == reveal.current
             context.fill(shape, with: .color(node.op.isEmpty ? Color.blue.opacity(0.10) : Color.purple.opacity(0.10)))
-            context.stroke(shape, with: .color(isCurrent ? Color.accentColor : Color.secondary.opacity(0.6)),
+            context.stroke(shape, with: .color(isCurrent ? Theme.accent : Color.secondary.opacity(0.6)),
                            lineWidth: isCurrent ? 2.5 : 1)
             let title = [node.label, node.op.isEmpty ? "" : node.op]
                 .filter { !$0.isEmpty }.joined(separator: "  ")
@@ -286,7 +286,7 @@ struct LandscapeInstrumentView: View {
             .frame(height: landscape.dims == 2 ? 300 : 220)
             Text(readout)
                 .font(.caption.monospaced())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Palette.secondaryText)
                 .textSelection(.enabled)
         }
     }
@@ -354,7 +354,7 @@ struct LandscapeInstrumentView: View {
             if penDown { path.addLine(to: p) } else { path.move(to: p) }
             penDown = true
         }
-        context.stroke(path, with: .color(.accentColor), lineWidth: 2)
+        context.stroke(path, with: .color(Theme.accent), lineWidth: 2)
         drawPath(in: &context, plot: plot) { point in
             guard point.count >= 2, let x = point[0], let f = point[1] else { return nil }
             return toScreen(x, min(max(f, yRange.lowerBound), yRange.upperBound), plot: plot)

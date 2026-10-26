@@ -565,7 +565,7 @@ private struct CompletionRow: View {
         .frame(height: CompletionController.rowHeight)
         .background {
             if isSelected {
-                RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.accentColor)
+                RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Theme.accent)
             }
         }
     }
@@ -670,7 +670,7 @@ struct SignatureHintView: View {
         out += piece("(")
         for (i, param) in sig.params.enumerated() {
             if i > 0 { out += piece(", ") }
-            out += i == sig.index ? piece(param, bold: true, color: .accentColor) : piece(param)
+            out += i == sig.index ? piece(param, bold: true, color: Theme.accent) : piece(param)
         }
         out += piece(")")
         return out
