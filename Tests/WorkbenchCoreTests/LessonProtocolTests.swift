@@ -65,6 +65,30 @@ final class LessonProtocolTests: XCTestCase {
         )
         XCTAssertEqual(Array(launch.arguments.suffix(2)), ["--content", "/c"])
     }
+
+    func testSourceCheckoutUsesDefaultEnvironment() {
+        let launch = SidecarLaunch(
+            uv: URL(fileURLWithPath: "/bin/uv"), pythonProject: URL(fileURLWithPath: "/p"),
+            workspace: URL(fileURLWithPath: "/w")
+        )
+        XCTAssertFalse(launch.arguments.contains("--frozen"))
+        XCTAssertNil(launch.environment(base: [:])["UV_PROJECT_ENVIRONMENT"])
+        // The test runner isn't an .app, so the checkout is never treated as bundled.
+        XCTAssertNil(SidecarLaunch.stateDirectory(for: URL(fileURLWithPath: "/p")))
+    }
+
+    func testBundledLaunchKeepsStateOutOfTheBundle() {
+        let launch = SidecarLaunch(
+            uv: URL(fileURLWithPath: "/bin/uv"),
+            pythonProject: URL(fileURLWithPath: "/Applications/ML Workbench.app/Contents/Resources/python"),
+            workspace: URL(fileURLWithPath: "/w"), stateDirectory: URL(fileURLWithPath: "/state")
+        )
+        XCTAssertTrue(launch.arguments.contains("--frozen"))
+        let env = launch.environment(base: ["HOME": "/h"])
+        XCTAssertEqual(env["HOME"], "/h")
+        XCTAssertEqual(env["UV_PROJECT_ENVIRONMENT"], "/state/python-env")
+        XCTAssertEqual(env["PYTHONPYCACHEPREFIX"], "/state/pycache")
+    }
 }
 
 final class MarkdownBlockTests: XCTestCase {

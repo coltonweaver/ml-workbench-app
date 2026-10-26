@@ -115,7 +115,22 @@ the workspace is committed each time you pass a lesson.
   `PATH`, in `~/.local/bin`, `~/.cargo/bin`, `/opt/homebrew/bin` or
   `/usr/local/bin`, or wherever `WORKBENCH_UV` points.
 
-## Run it
+## Install it
+
+```sh
+make install        # or: scripts/build-app.sh --install
+```
+
+This builds a release binary, wraps it in `ML Workbench.app` (with the
+`python/` sidecar and `content/` inside), signs it ad hoc and copies it to
+`/Applications` (set `INSTALL_DIR` to put it elsewhere). It also builds the
+app's Python environment in `~/Library/Application Support/ML Workbench`, so
+the first launch doesn't wait on a PyTorch download. `make app` builds
+`build/ML Workbench.app` without installing it. Re-run `make install` after
+pulling to update. Each build gets a new ad hoc signature, so macOS may ask
+once for Keychain access to the tutor's API key; choose Always Allow.
+
+## Run it from source
 
 ```sh
 swift run MLWorkbench
@@ -158,6 +173,8 @@ python/             the sidecar: runs the Jupyter kernel, pytest and the lesson 
   workbench_sidecar/
   tests/
 protocol.md         the JSON-lines protocol between the two
+scripts/build-app.sh  builds and installs ML Workbench.app
+packaging/          Info.plist template and app icon
 ```
 
 ### Why a Python sidecar

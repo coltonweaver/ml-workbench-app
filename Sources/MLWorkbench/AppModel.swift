@@ -137,7 +137,8 @@ final class AppModel: ObservableObject {
         stopKernel()
         let launch = SidecarLaunch(
             uv: uv, pythonProject: project, workspace: workspace.root,
-            content: SidecarLaunch.findContent()
+            content: SidecarLaunch.findContent(),
+            stateDirectory: SidecarLaunch.stateDirectory(for: project)
         )
         let client = SidecarClient(launch: launch)
         client.onExit = { [weak self] error in

@@ -32,6 +32,8 @@ jobs:
         run: swift test
         env:
           WORKBENCH_INTEGRATION: "1"
+      - name: Build and install the .app
+        run: INSTALL_DIR="$RUNNER_TEMP/Applications" scripts/build-app.sh --install
 
   # The Liquid Glass code is behind `#if compiler(>=6.2)`, so make sure it
   # compiles against the macOS 26 SDK even if the runner's default Xcode is older.

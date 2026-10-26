@@ -7,23 +7,52 @@ public struct SidecarLaunch: Sendable {
     public var workspace: URL
     /// The lesson content folder; lessons are unavailable without it.
     public var content: URL?
+    /// Where the Python environment and bytecode go when `pythonProject` is
+    /// read-only (inside an installed .app). Nil means uv's default,
+    /// `python/.venv` next to the project, which is what `swift run` uses.
+    public var stateDirectory: URL?
 
-    public init(uv: URL, pythonProject: URL, workspace: URL, content: URL? = nil) {
+    public init(uv: URL, pythonProject: URL, workspace: URL, content: URL? = nil, stateDirectory: URL? = nil) {
         self.uv = uv
         self.pythonProject = pythonProject
         self.workspace = workspace
         self.content = content
+        self.stateDirectory = stateDirectory
     }
 
     public var arguments: [String] {
-        var args = [
-            "run", "--quiet", "--project", pythonProject.path,
-            "python", "-m", "workbench_sidecar", "--workspace", workspace.path,
-        ]
+        var args = ["run", "--quiet", "--project", pythonProject.path]
+        if stateDirectory != nil {
+            // Never rewrite uv.lock inside the signed bundle.
+            args.append("--frozen")
+        }
+        args += ["python", "-m", "workbench_sidecar", "--workspace", workspace.path]
         if let content {
             args += ["--content", content.path]
         }
         return args
+    }
+
+    /// The sidecar's environment: ours, plus redirects that keep uv and Python
+    /// from writing into the project when it lives in an app bundle.
+    public func environment(base: [String: String] = ProcessInfo.processInfo.environment) -> [String: String] {
+        var env = base
+        if let stateDirectory {
+            env["UV_PROJECT_ENVIRONMENT"] = stateDirectory.appendingPathComponent("python-env").path
+            env["PYTHONPYCACHEPREFIX"] = stateDirectory.appendingPathComponent("pycache").path
+        }
+        return env
+    }
+
+    /// `~/Library/Application Support/ML Workbench` when `pythonProject` is
+    /// inside the running app's bundle, nil for a source checkout.
+    public static func stateDirectory(for pythonProject: URL, bundle: Bundle = .main) -> URL? {
+        let bundlePath = bundle.bundleURL.standardizedFileURL.path
+        guard bundle.bundleURL.pathExtension == "app",
+              pythonProject.standardizedFileURL.path.hasPrefix(bundlePath + "/")
+        else { return nil }
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("ML Workbench")
     }
 
     /// GUI apps don't inherit the login shell's PATH, so look in the usual
@@ -130,6 +159,7 @@ public final class SidecarClient: @unchecked Sendable {
         process.executableURL = launch.uv
         process.arguments = launch.arguments
         process.currentDirectoryURL = launch.workspace
+        process.environment = launch.environment()
 
         let inPipe = Pipe(), outPipe = Pipe(), errPipe = Pipe()
         process.standardInput = inPipe
