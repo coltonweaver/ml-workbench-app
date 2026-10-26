@@ -243,6 +243,20 @@ public final class SidecarClient: @unchecked Sendable {
         }
     }
 
+    /// Completions and the enclosing call's signature at a position in
+    /// `code`. `line` is 1-based, `column` 0-based in Unicode scalars. Answers
+    /// with one `completions` event; a request overtaken by a newer one is
+    /// answered empty.
+    @discardableResult
+    public func complete(code: String, path: String?, line: Int, column: Int) throws -> String {
+        try send(.complete) {
+            $0.code = code
+            $0.path = path
+            $0.line = line
+            $0.column = column
+        }
+    }
+
     public func cancelTutor() throws {
         try send(.cancelTutor)
     }

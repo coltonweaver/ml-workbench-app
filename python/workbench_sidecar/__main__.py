@@ -3,7 +3,8 @@
 Requests are read from stdin one JSON object per line. Long-running requests
 (execute, run_file, run_tests, restart) are handled one at a time on a worker
 thread, so ``interrupt`` and ``shutdown`` stay responsive while code runs.
-Tutor questions (``ask_tutor``) have a thread of their own.
+Tutor questions (``ask_tutor``) and editor completions (``complete``) each
+have a thread of their own.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ import traceback
 from typing import Any, TextIO
 
 from . import PROTOCOL_VERSION
+from .completion import Completer
 from .kernel import KernelSession
 from .lessons import Catalog, ContentError, LessonService
 from .review import ReviewService
@@ -43,6 +45,7 @@ class Server:
         self._questions: queue.Queue[dict[str, Any] | None] = queue.Queue()
         self._tutor_worker = threading.Thread(target=self._answer, daemon=True)
         self.last_problem: str | None = None
+        self.completer = Completer(self.workspace, self.send)
 
     def send(self, event: dict[str, Any]) -> None:
         line = json.dumps(event, separators=(",", ":"))
@@ -54,6 +57,7 @@ class Server:
         self.kernel.start()
         self._worker.start()
         self._tutor_worker.start()
+        self.completer.start()
         self.send({"type": "ready", "protocol": PROTOCOL_VERSION,
                    "python": sys.version.split()[0], "workspace": self.workspace})
 
@@ -70,7 +74,10 @@ class Server:
             self.tutor.cancel()
         elif op == "ask_tutor":
             self._questions.put(request)
+        elif op == "complete":
+            self.completer.submit(request)
         elif op == "shutdown":
+            self.completer.stop()
             self.tutor.cancel()
             self._questions.put(None)
             self._jobs.put(None)

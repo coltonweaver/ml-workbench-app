@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "anthropic>=2.3.0",
     "ipykernel>=6.29",
+    "jedi>=0.19",
     "jupyter_client>=8.6",
     "numpy>=2.0",
     "pytest>=8.3",

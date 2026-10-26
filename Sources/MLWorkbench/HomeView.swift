@@ -1,3 +1,4 @@
+import AppKit
 import Charts
 import SwiftUI
 import WorkbenchCore
@@ -9,21 +10,25 @@ struct HomeView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                CourseHeader()
+            VStack(alignment: .leading, spacing: Theme.Space.xxl) {
+                CourseHero()
+                ModuleGrid()
                 WarmupsSection()
                 PredictionScoreSection(score: model.review?.score ?? .empty)
             }
-            .padding(24)
-            .frame(maxWidth: 760, alignment: .leading)
+            .padding(Theme.Space.xxl)
+            .frame(maxWidth: 980, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
-        .background(Color(nsColor: .textBackgroundColor))
+        .softScrollEdges()
+        .background(Color(light: NSColor(hex: 0xF6F6F8), dark: NSColor(hex: 0x17181B)))
     }
 }
 
-private struct CourseHeader: View {
+/// The big card at the top: greeting, overall progress and the next lesson.
+private struct CourseHero: View {
     @EnvironmentObject private var model: AppModel
+    @State private var drift = false
 
     private var lessons: [LessonSummary] { model.modules.flatMap(\.lessons) }
 
@@ -32,33 +37,195 @@ private struct CourseHeader: View {
         lessons.first { $0.status == "in_progress" } ?? lessons.first { $0.status == "new" }
     }
 
+    private var greeting: String {
+        let hour = Calendar.current.component(.hour, from: .now)
+        let part = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"
+        let first = NSFullUserName().split(separator: " ").first.map(String.init) ?? ""
+        return first.isEmpty ? part : "\(part), \(first)"
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("ML Workbench")
-                .font(.largeTitle.weight(.semibold))
-            if lessons.isEmpty {
-                Text("Loading lessons…").foregroundStyle(.secondary)
-            } else {
-                let passed = lessons.filter { $0.status == "passed" }.count
-                ProgressView(value: Double(passed), total: Double(lessons.count)) {
-                    Text("\(passed) of \(lessons.count) lessons passed")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: 360)
-                if let next {
-                    Button {
-                        model.selection = .lesson(next.id)
-                    } label: {
-                        Label("\(next.status == "new" ? "Start" : "Continue") \(next.id): \(next.title)",
-                              systemImage: "arrow.right.circle.fill")
+        let passed = lessons.filter { $0.status == "passed" }.count
+        let progress = lessons.isEmpty ? 0 : Double(passed) / Double(lessons.count)
+        HStack(alignment: .center, spacing: Theme.Space.xl) {
+            VStack(alignment: .leading, spacing: 10) {
+                Eyebrow("ML Workbench", color: .white.opacity(0.75))
+                Text(greeting)
+                    .font(Theme.display(34))
+                    .foregroundStyle(.white)
+                if lessons.isEmpty {
+                    Text("Loading lessons…")
+                        .foregroundStyle(.white.opacity(0.8))
+                } else {
+                    Text(passed == 0 ? "From a single derivative to training at scale, one lesson at a time."
+                         : "\(passed) of \(lessons.count) lessons passed. Keep the streak going.")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let next {
+                        let blocked = model.review?.warmups.isEmpty == false && next.status == "new"
+                        Button {
+                            model.selection = .lesson(next.id)
+                        } label: {
+                            Label("\(next.status == "new" ? "Start" : "Continue")  \(next.id) \(next.title)",
+                                  systemImage: "arrow.right")
+                                .font(.system(size: 13, weight: .semibold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                        }
+                        .secondaryButton()
+                        .controlSize(.large)
+                        .tint(.white)
+                        .disabled(blocked)
+                        .help(blocked ? "Do today's warm-ups first" : "")
+                        .padding(.top, 6)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(model.review?.warmups.isEmpty == false && next.status == "new")
-                    .help(model.review?.warmups.isEmpty == false && next.status == "new"
-                          ? "Do today's warm-ups first" : "")
                 }
             }
+            Spacer(minLength: 0)
+            if !lessons.isEmpty {
+                ZStack {
+                    ProgressRing(progress: progress, lineWidth: 10, tint: .white)
+                    VStack(spacing: 0) {
+                        Text("\(Int((progress * 100).rounded()))%")
+                            .font(Theme.display(26))
+                            .contentTransition(.numericText())
+                        Text("complete")
+                            .font(.caption)
+                            .opacity(0.8)
+                    }
+                    .foregroundStyle(.white)
+                }
+                .frame(width: 120, height: 120)
+            }
+        }
+        .padding(Theme.Space.xxl)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            MeshGradient(
+                width: 3, height: 3,
+                points: [
+                    [0, 0], [drift ? 0.6 : 0.4, 0], [1, 0],
+                    [0, drift ? 0.4 : 0.6], [drift ? 0.35 : 0.65, drift ? 0.6 : 0.4], [1, drift ? 0.6 : 0.4],
+                    [0, 1], [drift ? 0.4 : 0.6, 1], [1, 1],
+                ],
+                colors: [
+                    .indigo, .purple, .pink,
+                    .blue, .indigo, .purple,
+                    .teal, .blue, .indigo,
+                ]
+            )
+            .overlay(Color.black.opacity(0.12))
+        }
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.large, style: .continuous))
+        .shadow(color: .indigo.opacity(0.25), radius: 24, y: 12)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) { drift = true }
+        }
+    }
+}
+
+/// One card per module with its progress; a click opens where you left off.
+private struct ModuleGrid: View {
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        if !model.modules.isEmpty {
+            VStack(alignment: .leading, spacing: Theme.Space.m) {
+                SectionTitle("Modules", systemImage: "square.grid.2x2.fill", tint: .blue)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: Theme.Space.m)],
+                          alignment: .leading, spacing: Theme.Space.m) {
+                    ForEach(model.modules) { module in
+                        ModuleCard(module: module)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct ModuleCard: View {
+    @EnvironmentObject private var model: AppModel
+    let module: ModuleSummary
+    @State private var hovering = false
+
+    private static let tints: [Color] = [.orange, .pink, .purple, .indigo, .blue, .teal, .green, .mint]
+
+    var body: some View {
+        let passed = module.lessons.filter { $0.status == "passed" }.count
+        let total = max(module.lessons.count, 1)
+        let tint = Self.tints[(module.number - 1 + Self.tints.count) % Self.tints.count]
+        Button {
+            let target = module.lessons.first { $0.status != "passed" } ?? module.lessons.first
+            if let target { model.selection = .lesson(target.id) }
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("\(module.number)")
+                        .font(Theme.display(15))
+                        .foregroundStyle(.white)
+                        .frame(width: 30, height: 30)
+                        .background(tint.gradient, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    Spacer()
+                    if passed == module.lessons.count, passed > 0 {
+                        Image(systemName: "checkmark.seal.fill")
+                            .foregroundStyle(.white, Theme.pass)
+                            .font(.system(size: 18))
+                    } else {
+                        Text("\(passed)/\(module.lessons.count)")
+                            .font(.system(size: 11, weight: .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Text(module.title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(module.summary)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(tint.opacity(0.15))
+                        Capsule().fill(tint.gradient)
+                            .frame(width: max(4, geo.size.width * Double(passed) / Double(total)))
+                    }
+                }
+                .frame(height: 5)
+            }
+            .padding(Theme.Space.l)
+            .frame(maxWidth: .infinity, minHeight: 168, alignment: .topLeading)
+            .card(tint: hovering ? tint : nil)
+            .scaleEffect(hovering ? 1.015 : 1)
+            .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.card))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(Theme.Motion.snappy, value: hovering)
+    }
+}
+
+/// A section heading with a tinted icon.
+private struct SectionTitle: View {
+    let title: String
+    let systemImage: String
+    let tint: Color
+
+    init(_ title: String, systemImage: String, tint: Color) {
+        self.title = title
+        self.systemImage = systemImage
+        self.tint = tint
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            IconTile(systemImage: systemImage, tint: tint, size: 24)
+            Text(title)
+                .font(Theme.display(20))
         }
     }
 }
@@ -70,8 +237,7 @@ private struct WarmupsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Warm-ups", systemImage: "flame")
-                .font(.title2.weight(.semibold))
+            SectionTitle("Warm-ups", systemImage: "flame.fill", tint: .orange)
             let warmups = model.review?.warmups ?? []
             ForEach(model.warmupResults.prefix(3), id: \.id) { result in
                 WarmupResultCard(result: result)
@@ -120,6 +286,8 @@ private struct WarmupCard: View {
             input
             HStack {
                 Button("Answer") { model.answer(warmup) }
+                    .prominentButton()
+                    .tint(.orange)
                     .keyboardShortcut(.return, modifiers: [.command])
                     .disabled(draft.wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty
                               || model.kernelState != .idle)
@@ -133,8 +301,8 @@ private struct WarmupCard: View {
                 }
             }
         }
-        .padding(14)
-        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        .padding(Theme.Space.l)
+        .card(tint: .orange)
     }
 
     @ViewBuilder
@@ -185,8 +353,9 @@ private struct WarmupResultCard: View {
                 .buttonStyle(.link)
             }
         }
-        .padding(14)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        .padding(Theme.Space.l)
+        .card(tint: result.correct ? Theme.pass : Theme.warn)
+        .transition(.move(edge: .top).combined(with: .opacity))
     }
 }
 
@@ -197,26 +366,29 @@ private struct PredictionScoreSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Prediction score", systemImage: "scope")
-                .font(.title2.weight(.semibold))
+            SectionTitle("Prediction score", systemImage: "scope", tint: .purple)
             Text(score.verdict)
                 .foregroundStyle(.secondary)
             if score.count > 0 {
-                HStack(spacing: 28) {
+                HStack(spacing: Theme.Space.m) {
                     stat(percent(score.hitRate), "right", "\(score.correct) of \(score.count) predictions")
                     if let brier = score.brier {
                         stat(String(format: "%.2f", brier), "Brier score",
                              "0 is perfect; always saying 50% scores 0.25")
                     }
                 }
-                HStack(alignment: .top, spacing: 24) {
+                HStack(alignment: .top, spacing: Theme.Space.m) {
                     if !score.buckets.isEmpty {
                         CalibrationChart(buckets: score.buckets)
                             .frame(width: 260, height: 220)
+                            .padding(Theme.Space.l)
+                            .card()
                     }
                     if score.history.count > 1 {
                         RunningHitRateChart(history: score.history)
                             .frame(minWidth: 260, maxWidth: .infinity, minHeight: 220, maxHeight: 220)
+                            .padding(Theme.Space.l)
+                            .card()
                     }
                 }
             }
@@ -225,9 +397,15 @@ private struct PredictionScoreSection: View {
 
     private func stat(_ value: String, _ label: String, _ help: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(value).font(.system(size: 30, weight: .semibold, design: .rounded))
+            Text(value)
+                .font(Theme.display(30, weight: .semibold))
+                .contentTransition(.numericText())
             Text(label).font(.caption).foregroundStyle(.secondary)
         }
+        .padding(.horizontal, Theme.Space.l)
+        .padding(.vertical, Theme.Space.m)
+        .frame(minWidth: 140, alignment: .leading)
+        .card()
         .help(help)
     }
 }

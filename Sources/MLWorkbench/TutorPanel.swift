@@ -8,57 +8,108 @@ struct TutorPanel: View {
     @Environment(\.openSettings) private var openSettings
     @FocusState private var inputFocused: Bool
 
+    private static let suggestions = [
+        "Give me a hint, not the answer",
+        "Why is my check failing?",
+        "Explain the idea behind this lesson",
+    ]
+
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider()
             if !model.hasAPIKey {
                 ContentUnavailableView {
-                    Label("Add an API key", systemImage: "key")
+                    Label("Add an API key", systemImage: "key.fill")
                 } description: {
                     Text("The tutor runs on the Claude API. Add your key in Settings; it's stored in your Keychain.")
                 } actions: {
                     Button("Open Settings") { openSettings() }
+                        .prominentButton()
                 }
+                .frame(maxHeight: .infinity)
             } else if model.tutor.messages.isEmpty {
-                ContentUnavailableView {
-                    Label("Ask the tutor", systemImage: "graduationcap")
-                } description: {
-                    Text("It sees your lesson, your file, your last error and your prediction, and it coaches rather than hands out answers. Use \"Explain\" on an instrument to ask about a tensor.")
-                }
+                emptyState
+                    .frame(maxHeight: .infinity)
             } else {
                 transcript
             }
-            Divider()
             input
         }
-        .frame(minWidth: 280)
+        .frame(minWidth: 300)
+        .animation(Theme.Motion.smooth, value: model.tutor.messages.count)
     }
 
     private var header: some View {
-        HStack {
-            Text("Tutor").font(.headline)
+        HStack(spacing: 8) {
+            IconTile(systemImage: "graduationcap.fill", tint: .indigo, size: 24)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Tutor").font(.system(size: 13, weight: .semibold))
+                Text(model.tutor.isAnswering ? "Thinking…" : "Coaches, doesn't hand out answers")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .contentTransition(.opacity)
+            }
             Spacer()
-            Button("Clear") { model.clearTutor() }
-                .buttonStyle(.borderless)
-                .disabled(model.tutor.messages.isEmpty)
+            Button {
+                withAnimation(Theme.Motion.smooth) { model.clearTutor() }
+            } label: {
+                Image(systemName: "square.and.pencil")
+            }
+            .buttonStyle(.borderless)
+            .help("New conversation")
+            .disabled(model.tutor.messages.isEmpty)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: Theme.Space.m) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 30, weight: .light))
+                .foregroundStyle(.indigo.gradient)
+                .symbolEffect(.pulse, options: .repeating.speed(0.4))
+            Text("Ask about this lesson")
+                .font(Theme.display(16, weight: .semibold))
+            Text("The tutor sees your lesson, your file, your last error and your prediction. Use Explain on an instrument to ask about a tensor.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            VStack(spacing: 6) {
+                ForEach(Self.suggestions, id: \.self) { suggestion in
+                    Button {
+                        model.askTutor(suggestion)
+                    } label: {
+                        Text(suggestion)
+                            .font(.system(size: 12, weight: .medium))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.plain)
+                    .glassCapsule(interactive: true)
+                }
+            }
+            .padding(.top, 4)
+        }
+        .padding(Theme.Space.xl)
     }
 
     private var transcript: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
+                LazyVStack(alignment: .leading, spacing: 14) {
                     ForEach(model.tutor.messages) { message in
                         TutorMessageView(message: message, streaming: model.tutor.isAnswering
                                          && message.id == model.tutor.messages.last?.id)
                             .id(message.id)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
-                .padding(12)
+                .padding(14)
             }
+            .softScrollEdges()
             .onChange(of: model.tutor.messages.last?.text) { _, _ in
                 if let last = model.tutor.messages.last?.id {
                     proxy.scrollTo(last, anchor: .bottom)
@@ -75,20 +126,36 @@ struct TutorPanel: View {
                 .focused($inputFocused)
                 .onSubmit { model.askTutor() }
                 .disabled(!model.hasAPIKey)
+                .padding(.vertical, 4)
             if model.tutor.isAnswering {
-                Button { model.stopTutor() } label: { Image(systemName: "stop.circle.fill") }
-                    .help("Stop the answer")
+                Button { model.stopTutor() } label: {
+                    Image(systemName: "stop.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.secondary)
+                }
+                .help("Stop the answer")
+                .transition(.scale.combined(with: .opacity))
             } else {
-                Button { model.askTutor() } label: { Image(systemName: "arrow.up.circle.fill") }
-                    .disabled(model.tutorDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                              || !model.hasAPIKey)
-                    .keyboardShortcut(.return, modifiers: .command)
-                    .help("Send (Return)")
+                let empty = model.tutorDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                Button { model.askTutor() } label: {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(empty ? AnyShapeStyle(HierarchicalShapeStyle.tertiary) : AnyShapeStyle(Color.accentColor))
+                }
+                .disabled(empty || !model.hasAPIKey)
+                .keyboardShortcut(.return, modifiers: .command)
+                .help("Send (Return)")
+                .transition(.scale.combined(with: .opacity))
             }
         }
         .buttonStyle(.borderless)
         .font(.body)
+        .padding(.leading, 14)
+        .padding(.trailing, 6)
+        .padding(.vertical, 6)
+        .glassSurface(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .padding(10)
+        .animation(Theme.Motion.snappy, value: model.tutor.isAnswering)
         .onAppear { inputFocused = true }
     }
 }
@@ -102,20 +169,52 @@ private struct TutorMessageView: View {
             if message.role == .user {
                 Text(message.text)
                     .textSelection(.enabled)
-                    .padding(8)
-                    .background(Color.accentColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 8))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.accentColor.gradient, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.leading, 40)
             } else if message.isError {
-                Label(message.text, systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.red)
+                Label(message.text, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(Theme.fail)
+                    .padding(10)
+                    .background(Theme.fail.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             } else if message.text.isEmpty && streaming {
-                ProgressView().controlSize(.small)
+                TypingDots()
             } else {
-                MarkdownView(source: message.text)
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 20, height: 20)
+                        .background(Color.indigo.gradient, in: Circle())
+                    MarkdownView(source: message.text)
+                }
             }
             if let note = message.note {
                 Text(note).font(.caption).foregroundStyle(.secondary)
             }
+        }
+    }
+}
+
+/// Three dots that bounce while the tutor starts its answer.
+private struct TypingDots: View {
+    var body: some View {
+        TimelineView(.animation) { context in
+            let t = context.date.timeIntervalSinceReferenceDate
+            HStack(spacing: 4) {
+                ForEach(0..<3, id: \.self) { i in
+                    Circle()
+                        .fill(Color.secondary)
+                        .frame(width: 6, height: 6)
+                        .offset(y: -3 * max(0, sin((t * 6) - Double(i) * 0.7)))
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color.primary.opacity(0.06), in: Capsule())
         }
     }
 }

@@ -15,17 +15,24 @@ struct InstrumentsPane: View {
             }
         } else {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 16) {
+                LazyVStack(alignment: .leading, spacing: Theme.Space.l) {
                     HStack {
+                        Text("\(model.instruments.count) instrument\(model.instruments.count == 1 ? "" : "s")")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         Spacer()
-                        Button("Clear") { model.clearInstruments() }
-                            .buttonStyle(.borderless)
+                        Button("Clear", systemImage: "trash") {
+                            withAnimation(Theme.Motion.smooth) { model.clearInstruments() }
+                        }
+                        .buttonStyle(.borderless)
+                        .font(.caption)
                     }
                     ForEach(model.instruments) { item in
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
+                        VStack(alignment: .leading, spacing: Theme.Space.s) {
+                            HStack(spacing: Theme.Space.s) {
+                                IconTile(systemImage: "waveform.path.ecg", tint: .indigo, size: 20)
                                 Text(item.instrument.title)
-                                    .font(.subheadline.weight(.semibold))
+                                    .font(.system(size: 13, weight: .semibold))
                                 Spacer()
                                 ExplainButton(summaries: item.explain)
                             }
@@ -54,11 +61,14 @@ struct InstrumentsPane: View {
                                 TimelineInstrumentView(payload: timeline)
                             }
                         }
-                        .padding(10)
-                        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+                        .padding(Theme.Space.m)
+                        .card(radius: Theme.Radius.card - 2)
+                        .transition(.asymmetric(insertion: .move(edge: .top).combined(with: .opacity),
+                                                removal: .opacity))
                     }
                 }
-                .padding(8)
+                .padding(Theme.Space.m)
+                .animation(Theme.Motion.smooth, value: model.instruments.map(\.id))
             }
         }
     }

@@ -33,10 +33,11 @@ echoes it.
 | `answer_warmup` | `warmup`, `value` | Grades a warm-up from the review queue and records it in `progress.json`. Answers with `review`, whose `result` is set. |
 | `ask_tutor` | `question`, `history`, `api_key`, `lesson`, `code`, `tensor` | Asks the tutor. `history` is the chat so far as `[{role, text}]`; `code` is the editor's text for the open lesson's file (read from disk when absent); `tensor` is a summary from an instrument's `explain` list. `api_key` may be null, then `ANTHROPIC_API_KEY` is used. Answers with `tutor_delta` events and `tutor_done`. |
 | `cancel_tutor` | | Stops the answer that's streaming. Handled immediately. |
+| `complete` | `code`, `path`, `line`, `column` | Editor completions at a position in `code` (the editor's unsaved text; `path` is the workspace-relative file it belongs to, for resolving relative imports). `line` is 1-based, `column` 0-based in code points. Static analysis with Jedi, never the kernel, so it answers while code runs. Answers with `completions`. A request still waiting when a newer one arrives is answered empty with `done` status `aborted`. |
 | `check_lesson` | `lesson` | Runs the lesson's hidden tests against the workspace, updates `progress.json`, commits the workspace on a first pass. Answers with `test_report`, `lesson`, `lessons`, `review`. |
 
-Everything except `interrupt`, `shutdown`, `ask_tutor` and `cancel_tutor` is
-queued and handled one at a time. Tutor questions have their own queue, so
+Everything except `interrupt`, `shutdown`, `ask_tutor`, `cancel_tutor` and
+`complete` is queued and handled one at a time. Tutor questions have their own queue, so
 they're answered while code runs. The sidecar remembers the last `error` or
 failing `test_report` it sent and gives it to the tutor; a passing report
 clears it. Tutor problems (no key, a rejected key, no network) come back as
@@ -81,6 +82,7 @@ sends one of them as `ask_tutor`'s `tensor`.
 | `review`         | `review`: `{warmups, score, result}`. `warmups`: up to 3 of `{id, concept, lesson, lesson_title, context, kind, prompt, options, mistakes, last_message}` for concepts with failed checks in two or more runs before this session. `score`: `{count, correct, hit_rate, rated, brier, overconfidence, buckets: [{confidence, count, hit_rate}], history: [{lesson, correct, confidence, hit_rate}]}` over passed lessons' graded predictions. `result`: after `answer_warmup`, `{id, concept, correct, yours, answer, explain, lesson, lesson_title}`, else null. |
 | `tutor_delta`    | `text`: the next piece of the tutor's answer |
 | `tutor_done`     | `stop_reason` (`end_turn`, `max_tokens`, `refusal`, `cancelled`), `model`, `note` (why it stopped, for refusals) |
+| `completions`    | `completions`: list of `{name, complete, type, signature, doc}`, where `complete` is the text to insert after what's typed and `type` is Jedi's kind (`function`, `class`, `module`, `instance`, `keyword`, `statement`, `param`, `property`, `path`); `signature` and `doc` are filled for the first dozen only. `signatures`: the call the cursor is inside, as `[{name, params, index, doc}]` (at most one). |
 | `done`           | `status` (`ok`, `error`, `aborted`). Always the last event for a request. |
 
 Example:

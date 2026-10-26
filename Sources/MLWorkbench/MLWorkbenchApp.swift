@@ -16,12 +16,14 @@ struct MLWorkbenchApp: App {
         WindowGroup("ML Workbench") {
             ContentView()
                 .environmentObject(model)
-                .frame(minWidth: 900, minHeight: 600)
+                .frame(minWidth: 1000, minHeight: 640)
                 .onAppear { model.start() }
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
                     model.stopKernel()
                 }
         }
+        .defaultSize(width: 1440, height: 900)
+        .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(replacing: .saveItem) {
                 Button("Save") { model.save() }

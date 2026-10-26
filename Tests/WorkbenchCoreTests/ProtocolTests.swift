@@ -50,4 +50,26 @@ final class ProtocolTests: XCTestCase {
         XCTAssertEqual(buffer.append(Data(":3}\n".utf8)).map { String(decoding: $0, as: UTF8.self) },
                        [#"{"c":3}"#])
     }
+
+    func testCompleteRequestEncodes() throws {
+        let request = SidecarRequest(id: "c1", op: .complete, code: "math.fl", path: "m01/slope.py",
+                                     line: 3, column: 7)
+        let line = String(decoding: try request.encodedLine(), as: UTF8.self)
+        XCTAssertEqual(line, #"{"code":"math.fl","column":7,"id":"c1","line":3,"op":"complete","path":"m01/slope.py"}"# + "\n")
+    }
+
+    func testDecodesCompletions() throws {
+        let json = """
+        {"type":"completions","id":"c1",
+         "completions":[{"name":"floor","complete":"oor","type":"function","signature":"floor(x, /)","doc":"Return the floor."},
+                        {"name":"fmod","complete":"","type":"function","signature":null,"doc":null}],
+         "signatures":[{"name":"slope","params":["f","x","h=1e-5"],"index":1,"doc":null}]}
+        """
+        let event = try JSONDecoder().decode(SidecarEvent.self, from: Data(json.utf8))
+        XCTAssertEqual(event.kind, .completions)
+        XCTAssertEqual(event.completions?.map(\.name), ["floor", "fmod"])
+        XCTAssertEqual(event.completions?.first?.complete, "oor")
+        XCTAssertEqual(event.signatures?.first?.index, 1)
+        XCTAssertEqual(event.signatures?.first?.params.count, 3)
+    }
 }

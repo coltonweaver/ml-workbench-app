@@ -18,6 +18,7 @@ public struct SidecarRequest: Encodable, Equatable, Sendable {
         case cancelTutor = "cancel_tutor"
         case getReview = "get_review"
         case answerWarmup = "answer_warmup"
+        case complete
     }
 
     public var id: String
@@ -36,12 +37,16 @@ public struct SidecarRequest: Encodable, Equatable, Sendable {
     public var history: [TutorTurn]?
     public var apiKey: String?
     public var tensor: JSONValue?
+    // complete: 1-based line, 0-based column in Unicode scalars
+    public var line: Int?
+    public var column: Int?
 
     public init(
         id: String, op: Op, code: String? = nil, path: String? = nil, target: String? = nil,
         lesson: String? = nil, value: String? = nil, confidence: Double? = nil,
         warmup: String? = nil, question: String? = nil,
-        history: [TutorTurn]? = nil, apiKey: String? = nil, tensor: JSONValue? = nil
+        history: [TutorTurn]? = nil, apiKey: String? = nil, tensor: JSONValue? = nil,
+        line: Int? = nil, column: Int? = nil
     ) {
         self.id = id
         self.op = op
@@ -56,10 +61,13 @@ public struct SidecarRequest: Encodable, Equatable, Sendable {
         self.history = history
         self.apiKey = apiKey
         self.tensor = tensor
+        self.line = line
+        self.column = column
     }
 
     enum CodingKeys: String, CodingKey {
         case id, op, code, path, target, lesson, value, confidence, warmup, question, history, tensor
+        case line, column
         case apiKey = "api_key"
     }
 
@@ -88,6 +96,7 @@ public struct SidecarEvent: Decodable, Equatable, Sendable {
         case tutorDelta = "tutor_delta"
         case tutorDone = "tutor_done"
         case review
+        case completions
         case done
     }
 
@@ -128,6 +137,10 @@ public struct SidecarEvent: Decodable, Equatable, Sendable {
     // review
     public var review: ReviewState?
 
+    // completions
+    public var completions: [Completion]?
+    public var signatures: [CallSignature]?
+
     // test_report (flattened into the event on the wire)
     public var outcome: String?
     public var passed: Int?
@@ -142,7 +155,7 @@ public struct SidecarEvent: Decodable, Equatable, Sendable {
         case python, workspace, name, text, data, ename, evalue, traceback, status
         case displayID = "display_id"
         case outcome, passed, failed, tests, output
-        case modules, lesson, review
+        case modules, lesson, review, completions, signatures
         case stopReason = "stop_reason"
         case model, note
     }
@@ -163,6 +176,34 @@ public struct SidecarEvent: Decodable, Equatable, Sendable {
             output: output ?? ""
         )
     }
+}
+
+/// One editor completion from the sidecar's Jedi analysis.
+public struct Completion: Decodable, Equatable, Sendable, Hashable {
+    public var name: String
+    /// What to insert after the part already typed.
+    public var complete: String
+    /// Jedi's kind: function, class, module, instance, keyword, statement, param, property, path.
+    public var type: String
+    public var signature: String?
+    public var doc: String?
+
+    public init(name: String, complete: String, type: String, signature: String? = nil, doc: String? = nil) {
+        self.name = name
+        self.complete = complete
+        self.type = type
+        self.signature = signature
+        self.doc = doc
+    }
+}
+
+/// The call the cursor is inside, for the parameter hint.
+public struct CallSignature: Decodable, Equatable, Sendable {
+    public var name: String
+    public var params: [String]
+    /// The parameter the cursor is on, if any.
+    public var index: Int?
+    public var doc: String?
 }
 
 public struct TestCase: Decodable, Equatable, Sendable, Identifiable {

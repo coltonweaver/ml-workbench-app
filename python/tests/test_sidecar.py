@@ -95,6 +95,17 @@ def test_execute_streams_output_and_keeps_state(sidecar: Sidecar) -> None:
     assert result[0]["data"]["text/plain"] == "42"
 
 
+def test_complete_answers_while_code_runs(sidecar: Sidecar) -> None:
+    sidecar.send(op="execute", code="import time; time.sleep(5)")
+    started = time.monotonic()
+    events = sidecar.request(op="complete", code="import math\nmath.fl", path="scratch.py",
+                             line=2, column=7, timeout=30)
+    [answer] = [e for e in events if e["type"] == "completions"]
+    assert "floor" in [c["name"] for c in answer["completions"]]
+    # Answered without waiting for the kernel.
+    assert time.monotonic() - started < 4
+
+
 def test_execute_error_is_reported(sidecar: Sidecar) -> None:
     events = sidecar.request(op="execute", code="1 / 0")
     errors = [e for e in events if e["type"] == "error"]

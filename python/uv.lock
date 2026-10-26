@@ -1580,6 +1580,7 @@ source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "ipykernel" },
+    { name = "jedi" },
     { name = "jupyter-client" },
     { name = "numpy" },
     { name = "pytest" },
@@ -1591,6 +1592,7 @@ dependencies = [
 requires-dist = [
     { name = "anthropic", specifier = ">=2.3.0" },
     { name = "ipykernel", specifier = ">=6.29" },
+    { name = "jedi", specifier = ">=0.19" },
     { name = "jupyter-client", specifier = ">=8.6" },
     { name = "numpy", specifier = ">=2.0" },
     { name = "pytest", specifier = ">=8.3" },

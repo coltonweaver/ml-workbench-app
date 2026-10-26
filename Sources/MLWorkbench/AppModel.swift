@@ -92,10 +92,18 @@ final class AppModel: ObservableObject {
         instruments.removeAll()
     }
 
+    func clearOutput() {
+        output.removeAll()
+    }
+
     private var savedText = ""
     private var client: SidecarClient?
     private var eventTask: Task<Void, Never>?
     private var pending: Set<String> = []
+    /// Completion requests waiting for their answer, by request id.
+    private var completionWaiters: [String: CheckedContinuation<CompletionResult?, Never>] = [:]
+    /// Completion requests whose `done` hasn't arrived yet.
+    private var completionRequests: Set<String> = []
 
     init(workspaceRoot: URL = Workspace.defaultRoot()) {
         workspace = Workspace(root: workspaceRoot)
@@ -162,6 +170,8 @@ final class AppModel: ObservableObject {
         client?.shutdown()
         client = nil
         pending.removeAll()
+        for id in Array(completionWaiters.keys) { finishCompletion(id, nil) }
+        completionRequests.removeAll()
         kernelState = .stopped
     }
 
@@ -397,11 +407,53 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: Completions
+
+    struct CompletionResult {
+        var completions: [Completion]
+        var signature: CallSignature?
+    }
+
+    /// Asks the sidecar for completions at a position in the editor's text.
+    /// nil when the sidecar isn't running or a newer request overtook this one.
+    func completions(code: String, line: Int, column: Int) async -> CompletionResult? {
+        guard let client else { return nil }
+        let path = selectedFile
+        return await withCheckedContinuation { continuation in
+            do {
+                let id = try client.complete(code: code, path: path, line: line, column: column)
+                completionWaiters[id] = continuation
+                completionRequests.insert(id)
+            } catch {
+                continuation.resume(returning: nil)
+            }
+        }
+    }
+
+    private func finishCompletion(_ id: String, _ result: CompletionResult?) {
+        completionWaiters.removeValue(forKey: id)?.resume(returning: result)
+    }
+
     // MARK: Events
 
     private func handle(_ event: SidecarEvent) {
         if let id = event.id, id == tutor.activeRequest {
             handleTutor(event, request: id)
+            return
+        }
+        if let id = event.id, completionRequests.contains(id) {
+            switch event.kind {
+            case .completions:
+                finishCompletion(id, CompletionResult(completions: event.completions ?? [],
+                                                      signature: event.signatures?.first))
+            case .done:
+                completionRequests.remove(id)
+                finishCompletion(id, nil)
+            case .error:
+                finishCompletion(id, nil)
+            default:
+                break
+            }
             return
         }
         switch event.kind {
@@ -449,8 +501,8 @@ final class AppModel: ObservableObject {
             append(.error, text)
         case .testReport:
             testReport = event.testReport
-        case .tutorDelta, .tutorDone:
-            break  // a stopped answer's stragglers
+        case .tutorDelta, .tutorDone, .completions:
+            break  // a stopped answer's stragglers, or a completion nobody waits for
         case .done:
             if let id = event.id { pending.remove(id) }
             if pending.isEmpty, kernelState == .busy { kernelState = .idle }
