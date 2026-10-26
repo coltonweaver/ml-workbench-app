@@ -24,9 +24,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
+      - name: Toolchain
+        run: xcodebuild -version && swift --version
       - name: Build
         run: swift build
       - name: Test (includes the real sidecar)
         run: swift test
         env:
           WORKBENCH_INTEGRATION: "1"
+
+  # The Liquid Glass code is behind `#if compiler(>=6.2)`, so make sure it
+  # compiles against the macOS 26 SDK even if the runner's default Xcode is older.
+  app-sdk26:
+    name: macOS app (macOS 26 SDK)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 26
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE" ]; then
+            echo "::error::No Xcode 26 on this runner"; ls /Applications | grep -i xcode; exit 1
+          fi
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+          swift --version
+      - name: Build
+        run: swift build
