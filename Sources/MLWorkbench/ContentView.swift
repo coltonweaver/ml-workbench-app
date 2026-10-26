@@ -183,6 +183,16 @@ private struct Sidebar: View {
     @EnvironmentObject private var model: AppModel
     @AppStorage("collapsedModules") private var collapsedRaw = ""
     @AppStorage("filesExpanded") private var filesExpanded = false
+    @State private var hoverFrames: [UUID: CGRect] = [:]
+    @State private var pointer: CGPoint?
+
+    /// Hover is worked out here from the pointer and the rows' frames rather
+    /// than with onHover on each row: inside this scroll view, under the
+    /// toolbar, the rows' own tracking areas land a couple of rows off.
+    private var hovered: UUID? {
+        guard let pointer else { return nil }
+        return hoverFrames.first { $0.value.contains(pointer) }?.key
+    }
 
     private var collapsed: Set<String> {
         Set(collapsedRaw.split(separator: ",").map(String.init))
@@ -239,7 +249,6 @@ private struct Sidebar: View {
                                         .truncationMode(.tail)
                                 }
                                 .id(SidebarItem.lesson(lesson.id))
-                                .help("\(lesson.id) \(lesson.title)")
                             }
                         }
                     }
@@ -267,6 +276,15 @@ private struct Sidebar: View {
                 .padding(.top, 6)
                 .padding(.bottom, 12)
             }
+            .coordinateSpace(.named(SidebarHover.space))
+            .onPreferenceChange(SidebarHover.Frames.self) { hoverFrames = $0 }
+            .onContinuousHover(coordinateSpace: .named(SidebarHover.space)) { phase in
+                switch phase {
+                case .active(let point): pointer = point
+                case .ended: pointer = nil
+                }
+            }
+            .environment(\.sidebarHovered, hovered)
             .thinScrollBar()
             .onAppear {
                 if let selection = model.selection, case .lesson = selection {
@@ -286,7 +304,9 @@ private struct SidebarRow<Content: View>: View {
     let selected: Bool
     let action: () -> Void
     let label: Content
-    @State private var hovering = false
+    @State private var key = UUID()
+    @Environment(\.sidebarHovered) private var hovered
+    private var hovering: Bool { hovered == key }
 
     init(selected: Bool, action: @escaping () -> Void, @ViewBuilder label: () -> Content) {
         self.selected = selected
@@ -311,7 +331,7 @@ private struct SidebarRow<Content: View>: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+        .reportsSidebarFrame(key)
     }
 }
 
@@ -321,7 +341,9 @@ private struct SidebarHeader: View {
     let expanded: Bool
     let detail: String?
     let action: () -> Void
-    @State private var hovering = false
+    @State private var key = UUID()
+    @Environment(\.sidebarHovered) private var hovered
+    private var hovering: Bool { hovered == key }
 
     var body: some View {
         Button(action: action) {
@@ -347,7 +369,7 @@ private struct SidebarHeader: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+        .reportsSidebarFrame(key)
         .animation(Theme.Motion.snappy, value: expanded)
     }
 }
@@ -797,6 +819,32 @@ private extension View {
         } else {
             toolbarBackground(Theme.Palette.background, for: .windowToolbar)
                 .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
+        }
+    }
+}
+
+private enum SidebarHover {
+    static let space = "sidebar"
+
+    struct Frames: PreferenceKey {
+        static let defaultValue: [UUID: CGRect] = [:]
+        static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
+            value.merge(nextValue()) { $1 }
+        }
+    }
+}
+
+private extension EnvironmentValues {
+    @Entry var sidebarHovered: UUID? = nil
+}
+
+private extension View {
+    func reportsSidebarFrame(_ key: UUID) -> some View {
+        background {
+            GeometryReader { proxy in
+                Color.clear.preference(key: SidebarHover.Frames.self,
+                                       value: [key: proxy.frame(in: .named(SidebarHover.space))])
+            }
         }
     }
 }
