@@ -79,6 +79,12 @@ final class CompletionController {
             return
         }
         if typed == "." {
+            // Not after a digit (1.5) or inside a string or comment.
+            let afterDigit = caret >= 2 && (48...57).contains(text.character(at: caret - 2))
+            if afterDigit || insideStringOrComment(at: caret, in: view.string) {
+                dismiss()
+                return
+            }
             anchor = caret
             isMember = true
             remote = []
